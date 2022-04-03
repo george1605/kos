@@ -1,0 +1,16 @@
+{
+    "files.associations": {
+        "lib.c": "c",
+        "irq.c": "c",
+        "tty.c": "c",
+        "ioctl.h": "c",
+        "fs.h": "c",
+        "mem.h": "c",
+        "vfs.h": "c",
+        "blockdev.h": "c",
+        "dma.h": "c",
+        "port.h": "c",
+        "cstdarg": "c"
+    },
+    "C_Cpp.errorSquiggles": "Disabled"
+}

@@ -1,0 +1,11 @@
+nasm -f elf32 -o loader.o boot.asm
+gcc -m32 -o kernel.o -c kernel.c -nostdlib -nostartfiles -nodefaultlibs
+ld -T linker.ld -m elf_i386 -o momo.bin loader.o kernel.o
+qemu-system-i386 -kernel momo.bin
+
+/* multiboot */
+
+mkdir -p isodir/boot/grub
+cp momo.bin isodir/boot/momo.bin
+cp grub.cfg isodir/boot/grub/grub.cfg
+grub-mkrescue -o momo.iso isodir
