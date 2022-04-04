@@ -11,7 +11,8 @@
         "dma.h": "c",
         "port.h": "c",
         "cstdarg": "c",
-        "pit.c": "cpp"
+        "pit.c": "cpp",
+        "elf.h": "c"
     },
     "C_Cpp.errorSquiggles": "Disabled"
 }

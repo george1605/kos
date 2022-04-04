@@ -11,6 +11,15 @@ struct thread {
   int ssize;
   struct file* ofiles;
 } cthread;
+typedef struct thread* thpool;
+
+void schedule(struct thread x, thpool pool)
+{
+    int a = 0;
+    while(pool[a].state != KILLED) a++;
+    pool[a] = x;
+    x.f(0,(char**)0);
+}
 
 struct ioctx {
   struct thread thr;
