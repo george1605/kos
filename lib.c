@@ -658,3 +658,13 @@ uint64_t mminq(void *addr)
                : "memory");
   return ret;
 }
+
+void mmoutq(void *addr, uint64_t data)
+{
+  uint64_t ret;
+  asm volatile("mov %0, %1"
+               : "r"(ret)
+               : "m"((uint64_t *)addr)
+               : "memory");
+  return ret;
+}
