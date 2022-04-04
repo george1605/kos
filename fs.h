@@ -805,3 +805,9 @@ int readi(struct inode *ip, char *dst, size_t off, size_t n)
   }
   return n;
 }
+
+void fclose(struct file f)
+{
+  (&f)->open = 0;
+  idewait(0);
+}

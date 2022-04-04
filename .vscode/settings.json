@@ -10,7 +10,8 @@
         "blockdev.h": "c",
         "dma.h": "c",
         "port.h": "c",
-        "cstdarg": "c"
+        "cstdarg": "c",
+        "pit.c": "cpp"
     },
     "C_Cpp.errorSquiggles": "Disabled"
 }

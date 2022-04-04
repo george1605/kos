@@ -1,13 +1,26 @@
 #pragma once
 #include "pit.c"
+#include "fs.h"
 #include "process.h"
+
 struct thread {
   int tid;
   prstate state;
   func f;
   char* stack;
   int ssize;
+  struct file* ofiles;
 } cthread;
+
+struct ioctx {
+  struct thread thr;
+  int ports[3];
+};
+
+void iolisten(int port){
+  while(!inb(port));
+}
+
 
 struct thread thnew(){ /* just creates a process */
   struct proc k;
@@ -65,4 +78,12 @@ struct fitex {
 
 void mutex_lock(struct mutex u){
   u.lock = 1;
+}
+
+void thexit(){
+  cthread.state = KILLED;
+  int c = 0;
+  while(cthread.ofiles[c])
+    fclose(cthread.ofiles[c]), c++;
+    
 }
