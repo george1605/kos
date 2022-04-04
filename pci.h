@@ -45,6 +45,7 @@
 #define PCI_SUBCLASS_ETHERNET 0x0
 #define PCI_SUBCLASS_USB 0x3
 
+#define PCI_CMD_INTERRUPT_DISABLE (1 << 10)
 #define PCI_CMD_SPECIAL_CYCLES (1 << 3)
 #define PCI_CMD_BUS_MASTER (1 << 2)
 #define PCI_CMD_MEMORY_SPACE (1 << 1)
@@ -281,4 +282,9 @@ void pciwrites(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint16_t
 void enable_mastering(int bus, int slot, int funcs) 
 { 
 	pciwrites(bus, slot, funcs, 0x4, pciread(bus, slot, funcs, 0x4) | PCI_CMD_BUS_MASTER);
+}
+
+void enable_interrupt(int bus, int slot, int funcs)
+{ 
+	pciwrites(bus, slot, funcs, 0x4, pciread(bus, slot, funcs, 0x4) & (~PCI_CMD_INTERRUPT_DISABLE)); 
 }

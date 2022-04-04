@@ -71,5 +71,6 @@ struct _xhcicon {
 } xhcilist;
  
 int xhcinew(){
-  
+  enable_mastering(0, 0, 0);
+  enable_interrupt(0, 0, 0);
 }
