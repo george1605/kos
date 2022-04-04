@@ -83,7 +83,7 @@ unsigned char *exception_messages[] =
     "Into Detected Overflow",
     "Out of Bounds",
     "Invalid Opcode",
-    "No Coprocessor",
+    "No Coprocessor", // FPU Not Found
 
     "Double Fault",
     "Coprocessor Segment Overrun",
@@ -118,8 +118,8 @@ void fault_handler(struct regs *r)
 {
     if (r->int_no < 32)
     {
-        kprint(exception_messages[r->int_no]);
-        perror("Exception. System Halted!\n");
+        perror(exception_messages[r->int_no]);
+        asm("pause");
     }
 }
 
