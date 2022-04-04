@@ -7,6 +7,7 @@
 #define M_STATIC 128
 #include "lib.c"
 #include "mem.h"
+#define PAGE_ALLIGN(x) (void *)(x - x % 4096 + 4096)
 size_t alig = 0;
 int *memcbrk = (int *)0x5E0000;
 int *heapend = (int *)0x3E00000;
@@ -249,4 +250,15 @@ char *strdup(char *x)
   char *ptr = kalloc(len, USER_MEM);
   memcpy(ptr, x, len);
   return ptr;
+}
+
+void freerange(void *from, void *to)
+{
+  if(from < _vm(0) || to < _vm(0)) return;
+  long x = (long)from;
+  while(x < to)
+  {
+    free(PAGE_ALLIGN(x));
+    x += 4096;
+  }
 }
