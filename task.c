@@ -58,3 +58,7 @@ struct task creatask(int var, void* ret, int(*myf)(void)){
    *(int*)ret = myf();
    return i;
 }
+
+void loadtask(){
+  asm("mov %0, %%ax; ltr %ax":"r"(0x28));
+}

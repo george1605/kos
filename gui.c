@@ -439,7 +439,7 @@ void SendSignal(int sig_no, void *params, elem element)
     DestroyWindow(*(struct window *)params);
     break;
   case 0xA0:
-
+    DrawWindow(*(struct window*)params);
     break;
   case 0xB1:
 

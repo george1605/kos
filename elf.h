@@ -78,6 +78,12 @@ struct ElfSymbol
   struct ElfSection st_shndx;
 };
 
+struct ElfToken
+{
+  uint64_t addr;
+  const char *name;
+};
+
 void readsym(struct ElfSymbol u, char bytes[])
 {
 }

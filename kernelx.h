@@ -14,6 +14,19 @@
 #define WORDVAR 2
 #define LLVAR 8
 
+struct ElfToken symtable[10];
+
+struct ElfToken symlook(uint64_t address)
+{
+  int a = 0;
+  for(a = 0;a < 10;a++)
+    if(symtable[a].addr == address)
+      return symtable[a];
+  
+  struct ElfToken tkn = {.addr = NULL_PTR};
+  return tkn;
+}
+
 struct stackfr {
   void* sstart;
   int nvar;
