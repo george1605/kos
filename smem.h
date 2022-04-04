@@ -8,6 +8,7 @@
 #include "lib.c"
 #include "mem.h"
 #define PAGE_ALLIGN(x) (void *)(x - x % 4096 + 4096)
+#define SETUP_HEAP(size) __attribute__((section(".heap"))) char memory[size]
 size_t alig = 0;
 int *memcbrk = (int *)0x5E0000;
 int *heapend = (int *)0x3E00000;
