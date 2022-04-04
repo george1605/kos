@@ -20,6 +20,10 @@ void prpush(int x){
   asm("push":"=r"(__ignore),"r"(x));
 }
 
-void prpop(){
-  asm("pop eax");
+void protmode(struct proc u){
+  prsave(u); // for switching between real and protected
+  CLI();
+  u.stack = malloc(0, 64000);
+  u.ssize = 64000;
+  asm("mov %0,%%esp": "r"(u.stack));
 }
