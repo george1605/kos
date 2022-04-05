@@ -1,5 +1,6 @@
 #pragma once
 #include "../bits.h"
+#include "../pci.h"
 struct hci_dev {
    char  name[8];
    unsigned long  flags;
@@ -15,19 +16,6 @@ struct hci_dev {
    int (*shutdown)(struct hci_dev *hdev);
 };
 
-#define hci_dev_set_flag(hdev, nr)     set_bit((nr), (hdev)->flags)
-#define hci_dev_clear_flag(hdev, nr)   clear_bit((nr), (hdev)->flags)
-
-#define hci_dev_clear_volatile_flags(hdev)			\
-	do {							\
-		hci_dev_clear_flag(hdev, HCI_LE_SCAN);		\
-		hci_dev_clear_flag(hdev, HCI_LE_ADV);		\
-		hci_dev_clear_flag(hdev, HCI_LL_RPA_RESOLUTION);\
-		hci_dev_clear_flag(hdev, HCI_PERIODIC_INQ);	\
-		hci_dev_clear_flag(hdev, HCI_QUALITY_REPORT);	\
-	} while(0)
-
-#define hci_clrflags(hci) hci_dev_clear_volatile_flags(hci)
 #define HCI_MAX_ACL_SIZE	1024
 #define HCI_MAX_SCO_SIZE	255
 #define HCI_MAX_ISO_SIZE	251
@@ -47,4 +35,8 @@ struct hci_dev {
 
 void hciopen(struct hci_dev* u){
    u->open(u);
+}
+
+void hciclose(struct hci_dev* u){
+   u->close(u);
 }

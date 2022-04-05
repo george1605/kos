@@ -175,6 +175,22 @@ struct rsdp_desc
   uint32_t raddr;
 } __attribute__((packed));
 
+const char *rsdp_sign = "RSD PTR ";
+
+struct rsdp_desc* rsdp_find()
+{
+  int a;
+  for (a = 0x00; a < 0x; a += 16)
+    if (strcmp(rsdp_sign, a) == 0)
+      return (struct rsdp_desc *)a;
+
+  for (a = 0xE0000; a < 0xFFFFF; a += 16)
+    if(strcmp(rsdp_sign,a) == 0)
+      return (struct rsdp_desc *)a;
+
+  return (struct rsdp_desc*)NULL_PTR;
+}
+
 struct pres
 {
   union
