@@ -246,12 +246,12 @@ struct vfile vfsopen(char *name)
 
 void vfsclose(struct vfile vf)
 {
-  
+  // TO DO!
 }
 
 struct buf* vfsread(struct vfile vf)
 {
-  struct *buf x = TALLOC(struct buf);
+  struct buf* x = TALLOC(struct buf);
   _read(vf.fd, x, 512);
   return x;
 }
