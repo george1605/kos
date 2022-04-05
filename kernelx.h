@@ -15,6 +15,7 @@
 #define LLVAR 8
 
 struct ElfToken symtable[10];
+int symcnt = 0;
 
 struct ElfToken symlook(uint64_t address)
 {
@@ -25,6 +26,21 @@ struct ElfToken symlook(uint64_t address)
   
   struct ElfToken tkn = {.addr = NULL_PTR};
   return tkn;
+}
+
+void symadd(struct ElfToken x)
+{
+  if(symcnt == 10) return;
+  symtable[symcnt++] = x;
+}
+
+func dlsym(char* name)
+{
+  for(int a = 0;a < 10;a++)
+    if(strcmp(symtable[a].name, name) == 0)
+      return (func)symtable[a].addr;
+  
+  return (func)NULL_PTR;
 }
 
 struct stackfr {
