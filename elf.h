@@ -208,9 +208,7 @@ struct SoHeader
   void (*somain)(int);
 };
 
-// Info | .Data | .RoData | .Text
-
-struct SoHeader *readso(int *ptr)
+struct SoHeader *readso(int *ptr) // int ptr[6]
 {
   if (!ptr)
     return 0;
@@ -222,9 +220,9 @@ struct SoHeader *readso(int *ptr)
   i->e_ident[3] = ptr[0];
   i->e_ident[4] = ptr[1];
 
-  i->e_sect[0] = vfsmap(".data", ptr[3] + VM_NUM);
-  i->e_sect[1] = vfsmap(".rodata", ptr[4] + VM_NUM);
-  i->e_sect[2] = vfsmap(".text", ptr[5] + VM_NUM);
+  i->e_sect[0] = vfsmap(".data", _vm(ptr[3]));
+  i->e_sect[1] = vfsmap(".rodata", _vm(ptr[4]));
+  i->e_sect[2] = vfsmap(".text", _vm(ptr[5]));
   return i;
 }
 

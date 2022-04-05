@@ -60,5 +60,6 @@ struct task creatask(int var, void* ret, int(*myf)(void)){
 }
 
 void loadtask(){
-  asm("mov %0, %%ax; ltr %ax":"r"(0x28));
+  int __ignore;
+  asm("mov %0, %%ax; ltr %ax":"=r"(__ignore):"r"(0x28));
 }

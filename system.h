@@ -180,7 +180,7 @@ const char *rsdp_sign = "RSD PTR ";
 struct rsdp_desc* rsdp_find()
 {
   int a;
-  for (a = 0x00; a < 0x; a += 16)
+  for (a = 0x01; a < 0x7BFF; a += 16)
     if (strcmp(rsdp_sign, a) == 0)
       return (struct rsdp_desc *)a;
 
