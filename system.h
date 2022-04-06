@@ -10,11 +10,19 @@
 #include "pci.h"
 #define PORTMAX 0xFFFF
 #define SYSRES 0xC0DEBA5E /* system reserved space */
-#define PM1a_CNT 0x4004
-#define SLP_TYPa 0
-#define SLP_EN 0
 int usermode = 0;
 int sysmode = 1;
+
+int *SMI_CMD;
+char ACPI_ENABLE;
+char ACPI_DISABLE;
+int *PM1a_CNT;
+int *PM1b_CNT;
+short SLP_TYPa;
+short SLP_TYPb;
+short SLP_EN;
+short SCI_EN;
+char PM1_CNT_LEN;
 
 #if _POSIX >= 2
 #define POSIX_ARG_MAX 4096
@@ -25,6 +33,7 @@ int sysmode = 1;
 #define POSIX_PIPE_BUF 512
 #define POSIX_SSIZE_MAX 32767
 #define POSIX_STREAM_MAX 8
+#define SEG_ALIGN __attribute__((aligned(POSIX_PIPE_BUF)))
 #endif
 #if _POSIX >= 3
 #define POSIX_PATH_MAX 4096
@@ -72,9 +81,10 @@ void sys_exec(void *arg1, void *arg2)
 
 void sys_open(void *arg1, void *arg2)
 {
-  int mode = sys_int(arg2);
-  struct file f = opfile((char *)arg1);
-  f.flags = mode;
+  struct vfile vf;
+  struct file fil;
+
+  vf = vfsopen(arg1);
 }
 
 void sys_mkdir(void *arg1, void *arg2)
@@ -191,6 +201,64 @@ struct rsdp_desc* rsdp_find()
   return (struct rsdp_desc*)NULL_PTR;
 }
 
+int acpi_enable(void)
+{
+  if ((inw((unsigned int)PM1a_CNT) & SCI_EN) == 0)
+  {
+    // check if acpi can be enabled
+    if (SMI_CMD != 0 && ACPI_ENABLE != 0)
+    {
+      outb((unsigned int)SMI_CMD, ACPI_ENABLE); 
+      int i;
+      for (i = 0; i < 300; i++)
+      {
+        if ((inw((unsigned int)PM1a_CNT) & SCI_EN) == 1)
+          break;
+        wait(10);
+      }
+      if ((int)PM1b_CNT != 0)
+        for (; i < 300; i++)
+        {
+          if ((inw((unsigned int)PM1b_CNT) & SCI_EN) == 1)
+            break;
+          sleep(10);
+        }
+      if (i < 300)
+      {
+        return 0;
+      }
+      else
+      {
+        return -1;
+      }
+    }
+    else
+    {
+      return -1;
+    }
+  }
+  else
+  {
+    return 0;
+  }
+}
+
+void acpi_shutdown(void)
+{
+  if (SCI_EN == 0)
+    return;
+
+  acpi_enable();
+  outw((unsigned int)PM1a_CNT, SLP_TYPa | SLP_EN);
+  if (PM1b_CNT != 0)
+    outw((unsigned int)PM1b_CNT, SLP_TYPb | SLP_EN);
+}
+
+void acpi_init(void)
+{
+  acpi_enable();
+}
+
 struct pres
 {
   union
@@ -214,7 +282,7 @@ void sys_abort()
 }
 
 uint32_t sys_memsz()
-{ // using CMOS
+{ 
   uint32_t total;
   uint16_t lowmem, highmem;
 

@@ -1,5 +1,6 @@
 #pragma once
 #include "lib.c"
+#define UPPER_MEM 0x100000
 #define VM_NUM 0x80000000
 #define DRIV_MEM 0xA0000000
 #define LM_NUM 0x1f0000

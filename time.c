@@ -11,6 +11,7 @@
 #define TIMER_FD 0xFF0
 #define rdtscl(dest) \
    asm("mfc0 %0,$9; nop" : "=r" (dest));
+#define DNOP() asm("nop; nop")
 #define QNOP() asm("nop; nop; nop; nop")
 
 struct rtcdate {
@@ -68,10 +69,10 @@ void rwait(int seconds) {
 	}
 }
 
-int timefunc(void (*x)())
+int timefunc(void (*f)())
 {
   int x = cmos_read(SECS);
-  x();
+  f();
   int y = cmos_read(SECS);
   return (y - x);
 }
