@@ -1,20 +1,12 @@
-global anwrite
-global anread
-global dgwrite
-global dgread
+section .bootloader
+    global load
+    global quit
 
-anwrite:
- ret
- 
-anread:
- ret
- 
-dgwrite:
- ret
- 
-dgread:
- ret
- 
-emquit:
- hlt
- jmp emquit ;just a loop
+load:
+    push r1
+    push r2
+    ret ; returns to C code
+
+quit:
+    hlt
+    jmp quit

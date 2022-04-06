@@ -6,7 +6,9 @@ typedef size_t uint_farptr_t;
 
 #define AVRIO_PIN(avrport, avrbit) ((avrport << 4) | avrbit)
 #define cli() CLI()
+#define _BREAK() asm("break" ::)
 #define _VECTOR(n) __vector_ ## n
+#define _STACK(n) __stack_ ## n
 #define sei() asm volatile("sei" ::)
 #define RAM_LIMIT  64 * 1024
 #define RAM_LIMIT2 4 * RAM_LIMIT
@@ -16,7 +18,7 @@ typedef size_t uint_farptr_t;
 #define PGWRT   2
 void abort(void)
 {
-  for (;;);// or while(true)
+  for (;;);// or while(1)
 }
 
 #define SREG_C  0
@@ -28,7 +30,7 @@ void abort(void)
 #define SREG_T  6
 #define SREG_I  7
 
-#define _SFR_MEM_ADDR(sfr)   ((uint16_t) (&sfr))
+uint16_t _SFR_MEM_ADDR(int sfr) { return ((uint16_t) (&sfr)); }
 #define SELFPRGEN   0
 #define __SPM_ENABLE SELFPRGEN
 #define GET_LOW_FUSE_BITS   0x0000
@@ -69,7 +71,7 @@ void abort(void)
 #define ADSC 6
 #define ADEN 7
 
- #define sleep_cpu()                              \
+#define sleep_cpu()                              \
   do {                                             \
      asm volatile ( "sleep" "\n\t" :: );    \
   } while(0)
@@ -122,7 +124,7 @@ void abort(void)
         "clr  r1\n\t"                            \
         :                                        \
         : "i" (0x30 + 0x27),        \
-          "i" (_SFR_MEM_ADDR(RAMPZ)),            \
+          "i" (RAMPZ + __SFR_OFFSET),            \
           "r" ((uint8_t)(__BOOT_PAGE_FILL)),     \
           "r" ((uint32_t)(address)),             \
           "r" ((uint16_t)(data))                 \
@@ -137,7 +139,7 @@ void abort(void)
         "sts %0, %1\n\t"                         \
         "spm\n\t"                                \
         :                                        \
-        : "i" (_SFR_MEM_ADDR(__SPM_REG)),        \
+        : "i" (__SPM_REG + __SFR_OFFSET),        \
           "r" ((uint8_t)(__BOOT_PAGE_ERASE)),    \
           "z" ((uint16_t)(address))              \
     );                                           \
@@ -152,7 +154,7 @@ void abort(void)
         ".word 0xffff\n\t"                       \
         "nop\n\t"                                \
         :                                        \
-        : "i" (_SFR_MEM_ADDR(__SPM_REG)),        \
+        : "i" (__SPM_REG + __SFR_OFFSET),        \
           "r" ((uint8_t)(__BOOT_PAGE_ERASE)),    \
           "z" ((uint16_t)(address))              \
     );                                           \
@@ -167,8 +169,8 @@ void abort(void)
         "sts %0, %2\n\t"                         \
         "spm\n\t"                                \
         :                                        \
-        : "i" (_SFR_MEM_ADDR(__SPM_REG)),        \
-          "i" (_SFR_MEM_ADDR(RAMPZ)),            \
+        : "i" (__SPM_REG + __SFR_OFFSET),        \
+          "i" (RAMPZ + __SFR_OFFSET),            \
           "r" ((uint8_t)(__BOOT_PAGE_ERASE)),    \
           "r" ((uint32_t)(address))              \
         : "r30", "r31"                           \
@@ -182,7 +184,7 @@ void abort(void)
         "sts %0, %1\n\t"                         \
         "spm\n\t"                                \
         :                                        \
-        : "i" (_SFR_MEM_ADDR(__SPM_REG)),        \
+        : "i" (__SPM_REG + __SFR_OFFSET),        \
           "r" ((uint8_t)(__BOOT_PAGE_WRITE)),    \
           "z" ((uint16_t)(address))              \
     );                                           \
@@ -197,7 +199,7 @@ void abort(void)
         ".word 0xffff\n\t"                       \
         "nop\n\t"                                \
         :                                        \
-        : "i" (_SFR_MEM_ADDR(__SPM_REG)),        \
+        : "i" (__SPM_REG + __SFR_OFFSET),        \
           "r" ((uint8_t)(__BOOT_PAGE_WRITE)),    \
           "z" ((uint16_t)(address))              \
     );                                           \
@@ -212,8 +214,8 @@ void abort(void)
         "sts %0, %2\n\t"                         \
         "spm\n\t"                                \
         :                                        \
-        : "i" (_SFR_MEM_ADDR(__SPM_REG)),        \
-          "i" (_SFR_MEM_ADDR(RAMPZ)),            \
+        : "i" (__SPM_REG + __SFR_OFFSET),        \
+          "i" (RAMPZ + __SFR_OFFSET),            \
           "r" ((uint8_t)(__BOOT_PAGE_WRITE)),    \
           "r" ((uint32_t)(address))              \
         : "r30", "r31"                           \
@@ -227,7 +229,7 @@ void abort(void)
         "sts %0, %1\n\t"                         \
         "spm\n\t"                                \
         :                                        \
-        : "i" (_SFR_MEM_ADDR(__SPM_REG)),        \
+        : "i" (__SPM_REG + __SFR_OFFSET),        \
           "r" ((uint8_t)(__BOOT_RWW_ENABLE))     \
     );                                           \
 }))
@@ -241,7 +243,7 @@ void abort(void)
         ".word 0xffff\n\t"                       \
         "nop\n\t"                                \
         :                                        \
-        : "i" (_SFR_MEM_ADDR(__SPM_REG)),        \
+        : "i" (__SPM_REG + __SFR_OFFSET),        \
           "r" ((uint8_t)(__BOOT_RWW_ENABLE))     \
     );                                           \
 }))
@@ -257,7 +259,7 @@ void abort(void)
         "sts %0, %1\n\t"                                   \
         "spm\n\t"                                          \
         :                                                  \
-        : "i" (_SFR_MEM_ADDR(__SPM_REG)),                  \
+        : "i" (__SPM_REG + __SFR_OFFSET),                  \
           "r" ((uint8_t)(__BOOT_LOCK_BITS_SET)),           \
           "r" (value)                                      \
         : "r0", "r30", "r31"                               \
@@ -277,7 +279,7 @@ void abort(void)
         ".word 0xffff\n\t"                                 \
         "nop\n\t"                                          \
         :                                                  \
-        : "i" (_SFR_MEM_ADDR(__SPM_REG)),                  \
+        : "i" (__SPM_REG + __SFR_OFFSET),                  \
           "r" ((uint8_t)(__BOOT_LOCK_BITS_SET)),           \
           "r" (value)                                      \
         : "r0", "r30", "r31"                               \
