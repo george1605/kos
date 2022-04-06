@@ -1,12 +1,47 @@
 #pragma once
 #include "../lib.c"
+#undef HALT
+#undef ASMV
 #define __AVR__ 1
+#define __GSUP__ 1
 typedef int  int_farptr_t;
 typedef size_t uint_farptr_t;
+typedef size_t time_t;
+volatile time_t __system_time;
+
+void* alloca(size_t size)
+{
+  if(size > 0xFFFF) return NULL_PTR;
+  return (void*)(0x1000 + size);
+}
+
+time_t time(time_t *timer)
+{
+  time_t ret;
+
+  asm volatile(
+      "in __tmp_reg__, __SREG__"
+      "\n\t"
+      "cli"
+      "\n\t" ::);
+  ret = __system_time;
+  asm volatile(
+      "out __SREG__, __tmp_reg__"
+      "\n\t" ::);
+  if (timer)
+    *timer = ret;
+  return ret;
+}
+
+time_t time_s(time_t* timer)
+{
+  if(timer == NULL_PTR) return;
+  return time(timer);
+}
 
 #define AVRIO_PIN(avrport, avrbit) ((avrport << 4) | avrbit)
 #define cli() CLI()
-#define _BREAK() asm("break" ::)
+#define break() asm volatile("break" ::)
 #define _VECTOR(n) __vector_ ## n
 #define _STACK(n) __stack_ ## n
 #define sei() asm volatile("sei" ::)
@@ -16,6 +51,23 @@ typedef size_t uint_farptr_t;
 #define __COMMON_ASRE 4
 #define PGERS   1
 #define PGWRT   2
+
+#define __SRD 0x0001   
+#define __SWR 0x0002   
+#define __SSTR 0x0004  
+#define __SPGM 0x0008  
+#define __SERR 0x0010  
+#define __SEOF 0x0020  
+#define __SUNGET 0x040 
+#define __SMALLOC 0x80
+
+struct file 
+{
+  char* buf;
+  unsigned char unget; // buffer for ungetc()
+  uint8_t flags;
+};
+
 void abort(void)
 {
   for (;;);// or while(1)
