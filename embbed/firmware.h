@@ -1,5 +1,7 @@
 #pragma once
 #include "../lib.c"
+#undef BASESP
+#undef ASMV
 
 #define MMIO32(x) (*(volatile unsigned int *)x)
 #define PPBI_BASE 0xE0000000U
@@ -11,6 +13,7 @@
 #define MPU_BASE SCS_BASE + 0x0D90
 #define RTC_BASE PERIPH_BASE_APB1 + 0x2800
 #define FLASH_MEM_INTERFACE_BASE PERIPH_BASE_AHB1 + 0x2000
+#define POWER_CONTROL_BASE PERIPH_BASE_APB1 + 0x7000
 
 #define MPU_TYPE MMIO32(MPU_BASE + 0x00)
 #define MPU_CTRL MMIO32(MPU_BASE + 0x04)
@@ -65,6 +68,15 @@
 #define FLASH_OPTKEYR_KEY1 FLASH_KEYR_KEY1
 #define FLASH_OPTKEYR_KEY2 FLASH_KEYR_KEY2
 
+#define PWR_CR1 MMIO32(POWER_CONTROL_BASE + 0x00)
+#define PWR_CR2 MMIO32(POWER_CONTROL_BASE + 0x04)
+#define PWR_CR3 MMIO32(POWER_CONTROL_BASE + 0x08)
+#define PWR_CR4 MMIO32(POWER_CONTROL_BASE + 0x0C)
+#define PWR_SR1 MMIO32(POWER_CONTROL_BASE + 0x10)
+#define PWR_SR2 MMIO32(POWER_CONTROL_BASE + 0x14)
+#define PWR_SCR MMIO32(POWER_CONTROL_BASE + 0x18)
+#define PWR_CR1_DBP (1 << 8)
+
 void flash_prefetch_enable(void)
 {
     FLASH_ACR |= FLASH_ACR_PRFTEN;
@@ -91,6 +103,16 @@ void flash_unlock_option_bytes(void)
     FLASH_OPTKEYR = FLASH_OPTKEYR_KEY2;
 }
 
+void pwr_disable_write(void)
+{
+    PWR_CR1 |= PWR_CR1_DBP;
+}
+
+void pwr_enable_write(void)
+{
+    PWR_CR1 &= ~PWR_CR1_DBP;
+}
+
 /* custom firmware */
 struct __fmmap
 {
@@ -98,3 +120,8 @@ struct __fmmap
     size_t pin17;
     size_t rtc;
 } fmemmap;
+
+long rtc_get()
+{
+    return MMIO32(fmemmap.rtc);
+}
