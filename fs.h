@@ -135,6 +135,16 @@ struct fileops
   void (*copy)(struct file a, char *location);
 } fops;
 
+struct file fcreat(char* name)
+{
+  struct file f;
+  f.name = name;
+  f.parent = &root;
+  struct farea* k = falloc(lastsect, 1, 128);
+  f.open = 1;
+  return f;
+}
+
 struct inode
 {
   size_t dev;

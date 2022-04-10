@@ -108,7 +108,8 @@ void mysh(char *comm)
 void kernel_close()
 {
   pci_unload();
-  irq_uninstall_handler(0); // removes the IRQ for Keyboard and
+  irq_uninstall_handler(0); 
   irq_uninstall_handler(1);
   vfsrem();
+  acpi_shutdown(); // shutdown
 }

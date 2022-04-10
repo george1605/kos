@@ -61,5 +61,10 @@ void argexec(int argc, char** argv){
   {
     kprintf("password: ");
     setuid(0);
+    argexec(argc - 1, argv + sizeof(char*));
+  }else if(strcmp(argv[0], "touch")){
+    fcreat(argv[1]);
+  }else{
+    kprint("Unknown command\n");
   }
 }

@@ -1,5 +1,6 @@
 #include "includes.h"
 #include "kernelx.h"
+#include "modules/bash.h"
 extern int glsig;
 
 void _shell(){
@@ -10,7 +11,7 @@ void _shell(){
 
 void kernel_main(){
   kernel_setup(0);
-  gui_setup();
+  cmdexec(gets(32));
   while(1){
     if(glsig == SHUTDOWN || glsig == RESTART)
       break;

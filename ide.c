@@ -169,6 +169,7 @@ struct farea {
 
 #define BUFSET(b, off, val) write32((void*)(b->data + off), val)
 #define BUFGET(b, off) read32((void *)(b->data + off))
+long lastsect = 5;
 
 struct farea* falloc(int sect, int dev, long len){
  struct farea* f = TALLOC(struct farea);
@@ -184,6 +185,7 @@ struct farea* falloc(int sect, int dev, long len){
 
  }
  bwrite(b, dev);
+ free(b);
  return b;
 }
 
