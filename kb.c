@@ -6,6 +6,7 @@
 #define NUM_LED 2
 #define CAPS_LED 4
 #define CTL(x) (x - '@')
+#define IS_PRESSED(buf) !((buf >> 7) & 1)
 
 extern int glsig;
 int kbignore = 0;
@@ -106,7 +107,7 @@ unsigned char kbdus[128] =
 };
 
 char *kbdbuf = (char *)(0x2C00FF);
-size_t kbdindex = 0xFF;
+uint16_t kbdindex = 0;
 void keyboard_handler(struct regs *r)
 {
   unsigned char scancode;
@@ -121,9 +122,9 @@ void keyboard_handler(struct regs *r)
       glsig = 0x20;
 
     if (kbdindex == 0)
-      kbdindex = 0xFF;
+      kbdindex = 0x80;
 
-    kbdbuf[kbdindex--] = kbdus[scancode];
+    kbdbuf[kbdindex++] = kbdus[scancode];
   }
 }
 
