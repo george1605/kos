@@ -1,5 +1,6 @@
 #pragma once
 #include "task.c"
+#include "kb.c"
 #define MAIN_USER 0x10
 #define NORM_USER 0x20
 int lastuid = 1;
@@ -41,4 +42,16 @@ void usadd(struct user i, struct group u){
 
 void ussetcwd(char* _cwd){
   cnuser.cwd = _cwd;
+}
+
+int setuid(int _id){
+  if(_id > 0)
+    cnuser.uid = _id;
+  else{
+    char* x = gets(32); // gets the password from kbd
+    if(strcmp(x,"***") == 0)
+      cnuser.uid = 0, return 0;
+    kprint("\nerror: wrong password");
+    free(x);
+  }
 }

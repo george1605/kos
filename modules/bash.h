@@ -1,5 +1,7 @@
 #include "../lib.c"
 #include "../mem.h"
+#include "../fs.h"
+#include "../user.h"
 int _seplen = 0;
 
 char* strsep(char* s, char* delm)
@@ -46,5 +48,18 @@ void cmdexec(char* str){
   char* comm = args[0];
   if(strcmp(comm,"echo") == 0){
     kprint(args[1]);
+  }else if(strcmp(comm,"mkdir")){
+    if(str[6] == 0) return;
+    mkdir(str + 6, &root);
+  }else{
+    kprint("Unknown command\n");
+  }
+}
+
+void argexec(int argc, char** argv){
+  if(strcmp(argv[0], "sudo"))
+  {
+    kprintf("password: ");
+    setuid(0);
   }
 }
