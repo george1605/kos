@@ -64,6 +64,8 @@ void argexec(int argc, char** argv){
     argexec(argc - 1, argv + sizeof(char*));
   }else if(strcmp(argv[0], "touch")){
     fcreat(argv[1]);
+  }else if(strcmp(argv[0], "shutdown")){
+    glsig = SHUTDOWN;
   }else{
     kprint("Unknown command\n");
   }

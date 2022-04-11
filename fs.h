@@ -821,3 +821,11 @@ void fclose(struct file f)
   (&f)->open = 0;
   idewait(0);
 }
+
+struct fat_diren
+{
+  char name[128];
+  uint8_t flags;
+  uint32_t first_cluster;
+  size_t size;
+};

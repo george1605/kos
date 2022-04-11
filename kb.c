@@ -149,6 +149,19 @@ char *gets(size_t chars)
   return i;
 }
 
+char* getl()
+{
+  char* i = alloc(0, 64);
+  int k = 0;
+  while(k < 64)
+  { 
+    i[k] = getch();
+    if(i[k] == '\n') break;
+    k++;
+  }
+  return i;
+}
+
 void keyboard_install()
 {
   irq_install_handler(1, keyboard_handler);
