@@ -229,14 +229,27 @@ void initlock(struct spinlock *u, char *name)
   u->name = name;
 }
 
+inline size_t xchg(volatile size_t *addr, size_t newval)
+{
+  size_t result;
+  asm volatile("lock; xchgl %0, %1"
+               : "+m"(*addr), "=a"(result)
+               : "1"(newval)
+               : "cc");
+  return result;
+}
+
 void acquire(struct spinlock *u)
 {
-  u->locked = 1;
+  CLI();
+  if(u->locked == 1) return;
+  while (xchg(&u->locked, 1) != 0);
 }
 
 void release(struct spinlock *u)
 {
   u->locked = 0;
+  u->cpu = NULL_PTR;
 }
 
 void pushcli(struct cpu *_cpu)
