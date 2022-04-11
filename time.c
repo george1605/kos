@@ -81,6 +81,8 @@ void waittick(){
   asm("sti; hlt");
 }
 
+#define UUID(macaddr) (uint64_t)((cmos_read(SECS) << 32) | (cmos_read(MINS) << 24) | (cmos_read(HOURS) << 16) | macaddr)
+
 #define HPETSECS(num) ((num)*1000000)
 #define HPETMSECS(num) ((num)*10000)
 #define HPETMICSECS(num) ((num)*10)
