@@ -1,6 +1,9 @@
 #pragma once
 #include "task.c"
 #include "kb.c"
+#include "fs.h"
+#define __USER_DENIED  // user denied access to certain functions
+#define __USER_ALLOWED
 #define MAIN_USER 0x10
 #define NORM_USER 0x20
 int lastuid = 1;
@@ -44,14 +47,26 @@ void ussetcwd(char* _cwd){
   cnuser.cwd = _cwd;
 }
 
+char* __USER_DENIED loadpwd() // xor decrypt the password
+{
+  struct buf* x = TALLOC(struct buf);
+  _read(20, x, 128);
+  int n;
+  while(x->data[n])
+    x->data[n] = x->data[n] ^ 0x1;
+}
+
+
+
 int setuid(int _id){
   if(_id > 0)
     cnuser.uid = _id;
   else{
-    char* x = gets(32); // gets the password from kbd
-    if(strcmp(x,"***") == 0)
+    char* x = getl(); // gets the password from kbd
+    char* p = loadpwd();
+    if(strcmp(x,p) == 0)
       cnuser.uid = 0, return 0;
     kprint("\nerror: wrong password");
-    free(x);
+    free(x), free(p);
   }
 }
