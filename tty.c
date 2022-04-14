@@ -3,7 +3,7 @@
 #include "lib.c"
 #include "drivers/ioctl.h"
 #include "vfs.h"
-#define TTYBASE 0xBB0
+#define TTYBASE 0xBB00
 #define MAXTTY 17
 #define TTY_ERR 128
 #define TTY_OPEN 1
@@ -116,6 +116,19 @@ void ttyraise(size_t num)
 { // closes the TTY and adds the TTY_ERR flag
   ttyclose(num);
   ttys[num].flags |= TTY_ERR;
+}
+
+void ttywait(size_t num)
+{
+    ttys[num].flags |= TTY_LOCK;
+    acquire(&ttys[num].lock);
+    DNOP();
+}
+
+void ttyplay(size_t num)
+{
+    ttys[num].flags &= ~TTY_LOCK;
+    release(&ttys[num].lock);
 }
 
 void ttyctl(int num, int func)

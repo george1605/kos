@@ -264,3 +264,20 @@ void freerange(void *from, void *to)
     x += 4096;
   }
 }
+
+void map_page(void* physaddr, void* virtualaddr, size_t flags) 
+{
+
+    uint64_t pdindex = (uint64_t)virtualaddr >> 22;
+    uint64_t ptindex = (uint64_t)virtualaddr >> 12 & 0x03FF;
+
+    uint64_t* pd = (uint64_t*)0xFFFFF000;
+    uint64_t* pt = ((uint64_t*)0xFFC00000) + (0x400 * pdindex);
+    pt[ptindex] = ((uint64_t)physaddr) | (flags & 0xFFF) | 0x01; 
+}
+
+void enable_paging(uint64_t address)
+{
+  int __ignore;
+  asm volatile("mov %0, %%cr3":"r"(address), "r"(__ignore));
+}

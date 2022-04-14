@@ -681,3 +681,21 @@ void mmoutq(void *addr, uint64_t data)
                : "memory");
   return ret;
 }
+
+void snprintf(char* x, char* y, void* args)
+{
+    int a = 0, argc = 0;
+    while (x[a] && y[a])
+    {
+        if (y[a] != '%' && y[a + 1] != 'i')
+            x[a] = y[a];
+        if (y[a] == '%' && y[a + 1] == 's')
+        {
+            char* n = ((char**)args)[argc];
+            memcpy(y + a + 1, n, strlen(n));
+            argc++;
+        }
+        a++;
+    }
+
+}
