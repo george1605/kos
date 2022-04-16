@@ -20,7 +20,13 @@ int17h:
   ret
 
 eficall0:
-  subq $40, rsp
+  sub rsp, 40
 	call *rdi
-	addq $40, rsp
+	add rsp, 40
 	ret
+
+eficall1:
+  add rdi, 44
+  call *rdi
+  sub rdi, 44
+  ret

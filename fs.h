@@ -819,6 +819,7 @@ int readi(struct inode *ip, char *dst, size_t off, size_t n)
 void fclose(struct file f)
 {
   (&f)->open = 0;
+  (&f)->parent = NULL_PTR;
   idewait(0);
 }
 
@@ -829,3 +830,10 @@ struct fat_diren
   uint32_t first_cluster;
   size_t size;
 };
+
+struct fat_dir
+{
+  struct fat_diren entry;
+};
+
+#define FAT_TABLE unsigned char fat_tbl[512]

@@ -276,8 +276,25 @@ void map_page(void* physaddr, void* virtualaddr, size_t flags)
     pt[ptindex] = ((uint64_t)physaddr) | (flags & 0xFFF) | 0x01; 
 }
 
+void *get_phys(void *virtualaddr)
+{
+  uint64_t pdindex = (uint64_t)virtualaddr >> 22;
+  unsigned long ptindex = (unsigned long)virtualaddr >> 12 & 0x03FF;
+
+  unsigned long *pd = (unsigned long *)0xFFFFF000;
+  unsigned long *pt = ((unsigned long *)0xFFC00000) + (0x400 * pdindex);
+
+  return (void *)((pt[ptindex] & ~0xFFF) + ((unsigned long)virtualaddr & 0xFFF));
+}
+
 void enable_paging(uint64_t address)
 {
   int __ignore;
-  asm volatile("mov %0, %%cr3":"r"(address), "r"(__ignore));
+  asm volatile("movl %0, %%cr3":"r"(address), "r"(__ignore));
+}
+
+static inline void tlb_flush(unsigned long addr) // invalidates a page
+{
+  asm volatile("invlpg (%0)" ::"r"(addr)
+               : "memory");
 }
