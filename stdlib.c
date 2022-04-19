@@ -2,7 +2,9 @@
 #include "lib.c"
 #include "fs.h"
 
-#define NULL 0
+#define NULL NULL_PTR
+#define TRUE 1
+#define FALSE 0
 #define bitor |
 #define or ||
 #define bitand &
@@ -38,6 +40,17 @@ char* strlow(char* u){
   for(a = 0;u[a] != 0;a++)
     if (u[a] >= 65 && u[a] <= 91)
       u[a] += 32;
+}
+
+FILE* _fopen(char* name, char* mod)
+{
+  return NULL;
+}
+
+void _fclose(FILE* x)
+{
+  if(x)
+    fclose(*x);
 }
 
 #define STACK(type)  struct stack_ ## type { \
