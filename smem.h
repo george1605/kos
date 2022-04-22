@@ -298,3 +298,11 @@ static inline void tlb_flush(unsigned long addr) // invalidates a page
   asm volatile("invlpg (%0)" ::"r"(addr)
                : "memory");
 }
+
+void *ioremap(void* x, size_t len)
+{
+  void* y = 0xFFFFF + (x + y) >> 1;
+  map_page(x, y, 0);
+  *(char*)y = 0xA0;
+  return y;
+}

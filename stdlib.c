@@ -1,8 +1,11 @@
 #pragma once
 #include "lib.c"
 #include "fs.h"
+#include "time.c"
 
-#define NULL 0
+#define NULL NULL_PTR
+#define TRUE 1
+#define FALSE 0
 #define bitor |
 #define or ||
 #define bitand &
@@ -13,8 +16,9 @@ typedef uint64_t xtime_t; // extended UNIX Time
 typedef struct file FILE;
 
 time_t time(int k){
-  if(k == 0)
+  if(k < 0)
     return 0;
+  return cmos_read(SECS);
 }
 
 void* malloc(int bytes){
@@ -38,6 +42,34 @@ char* strlow(char* u){
   for(a = 0;u[a] != 0;a++)
     if (u[a] >= 65 && u[a] <= 91)
       u[a] += 32;
+  return u;
+}
+
+int _fflags(char* fmod)
+{
+  if(strcmp(fmod, "w"))
+    return F_WRITE;
+  if(strcmp(fmod, "r"))
+    return F_READ;
+  return F_NEW; // the default flag is F_NEW
+}
+
+FILE *_fopen(char *name, char *mod)
+{
+  FILE* x = (FILE*)malloc(sizeof(FILE));
+  x->open = 1;
+  x->flags = _fflags(mod);
+  x->name = name;
+  return x;
+}
+
+void _fclose(FILE *x)
+{
+  if (x)
+  {
+    idewait(0);
+    free(x);
+  }
 }
 
 #define STACK(type)  struct stack_ ## type { \
@@ -51,3 +83,4 @@ char* strlow(char* u){
                       int size;  \
                       int pos;         \
                      }
+

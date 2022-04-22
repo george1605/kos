@@ -106,3 +106,7 @@ void krpi_main(){
         NOP();
     }
 }
+
+// some PICO Things
+#define PI3_BREAK asm volatile("brk  #0")
+#define PICO_GPIO_BASE 0x3F200000

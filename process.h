@@ -59,6 +59,15 @@ struct environ
   int type;
 };
 
+char* strenv(char* name, char* val)
+{
+  char* buf = alloc(0, 64), x = strlen(name);
+  memcpy(buf, name, x);
+  buf[x++] = '=';
+  memcpy(buf + x, val, strlen(val));
+  return buf;
+}
+
 struct sleeplock initsleep(struct proc u)
 {
   struct sleeplock i;
@@ -299,11 +308,25 @@ void popregs()
   asm volatile("pop %eax");
 }
 
+struct environ* envdef() // creates a default environment
+{
+  struct environ* x = TALLOC(struct environ);
+  x->cpunum = mycpu()->cid;
+  x->ctx = TALLOC(struct context);
+  #ifdef __ARM__
+    x->type = ARMENV;
+  #else
+    x->type = X86ENV;
+  #endif
+  readctx(x->ctx);
+  return x;
+}
+
 void mmap(void* mem, int flags, struct proc p) // maps a memory region to a process
 {
   if(mem == NULL) return;
   if(mem < KERN_MEM)
-    p.stack = _vm(mem);
+    p.stack = _vm(mem); // just temporary
 }
 
 void envinit(struct environ *u)

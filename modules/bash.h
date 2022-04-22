@@ -52,7 +52,7 @@ void cmdexec(char* str){
     if(str[6] == 0) return;
     mkdir(str + 6, &root);
   }else{
-    kprint("Unknown command\n");
+    sys_execv(args[0], args + 4);
   }
 }
 

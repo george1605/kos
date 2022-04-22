@@ -44,6 +44,13 @@ struct time {
     int year;
 };
 
+struct COM {
+  void* text;
+  void* data;
+  void* freesp;
+  void* stack;
+};
+
 void gettime(struct time* t) {
   if(t != NULL_PTR)
     filldate((struct rtcdate*)t);

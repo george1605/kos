@@ -28,6 +28,7 @@ typedef unsigned int size_t;
 typedef uint16_t wchar_t;
 typedef unsigned long long uint64_t;
 typedef double f64;
+size_t errno;
 
 void *getframe()
 {
@@ -596,9 +597,9 @@ int memcmp(char *str1, char *str2)
     {
       is_eq = 1;
     }
+    str1++, str2++; // i was dumb
   }
-  if (is_eq)
-    return 0;
+  return 0;
 }
 
 #define ERR_INVSTR -256 // invalid string error
@@ -643,6 +644,7 @@ wchar_t readustr(struct unistr i, size_t off)
 
 void raise(int code)
 {
+  errno = code;
   HALT();
 }
 
@@ -698,4 +700,13 @@ void snprintf(char* x, char* y, void* args)
         a++;
     }
 
+}
+
+char *strstr(const char *s1, const char *s2)
+{
+  size_t n = strlen(s2);
+  while (*s1)
+    if (!memcmp(s1++, s2))
+      return (char *)(s1 - 1);
+  return 0;
 }
