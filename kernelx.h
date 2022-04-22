@@ -128,3 +128,14 @@ void lockport(struct port u){
 void unlockport(struct port u){
   release(&u.lock);
 }
+
+void bootload()
+{
+  struct ElfHeader* hdr = (struct ElfHeader*)0x10000;
+  void(*entry)(void);
+  readseg((char*)hdr, 4096, 0);
+  if(!checkelf(hdr))
+    perror("Could not load the OS.(corrupted)");
+  entry = (void(*)(void))hdr->e_entry;
+  entry();
+}
