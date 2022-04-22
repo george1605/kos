@@ -72,6 +72,17 @@ void _fclose(FILE *x)
   }
 }
 
+FILE* _fopen(char* name, char* mod)
+{
+  return NULL;
+}
+
+void _fclose(FILE* x)
+{
+  if(x)
+    fclose(*x);
+}
+
 #define STACK(type)  struct stack_ ## type { \
                       type* buffer;         \
                       int size;  \
@@ -83,4 +94,7 @@ void _fclose(FILE *x)
                       int size;  \
                       int pos;         \
                      }
+<<<<<<< HEAD
 
+=======
+>>>>>>> ad040972e43d7dda8bf8b149237775b1a2185319
