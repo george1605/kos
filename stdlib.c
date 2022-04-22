@@ -4,6 +4,7 @@
 #include "time.c"
 
 #define NULL NULL_PTR
+#define RAND_MAX (1 << 32) - 1
 #define TRUE 1
 #define FALSE 0
 #define bitor |
@@ -30,6 +31,11 @@ void* malloc(int bytes){
 char to_upper(char u){
   if(u >= 65 && u <= 91)
     return (char)(u + 32);
+}
+
+void* calloc(int x, int y)
+{
+  return alloc(0, x * y); 
 }
 
 char to_lower(char u){
@@ -94,7 +100,3 @@ void _fclose(FILE* x)
                       int size;  \
                       int pos;         \
                      }
-<<<<<<< HEAD
-
-=======
->>>>>>> ad040972e43d7dda8bf8b149237775b1a2185319
