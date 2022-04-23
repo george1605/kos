@@ -3,6 +3,7 @@
 #include "elf.h"
 #include "lib.c"
 #include "port.h"
+#include "mutex.h"
 #define HDR_SECTION __attribute__((section(".hdr")))
 #define KERNEL_FUNC 0x09
 #define DRIVER_FUNC 0x0A
@@ -138,4 +139,20 @@ void bootload()
     perror("Could not load the OS.(corrupted)");
   entry = (void(*)(void))hdr->e_entry;
   entry();
+}
+
+void __ata_async(int argc, char** argv) // asynchronous IO
+{
+  if(argc < 3) return;
+  if(argv[0][0] == 'r')
+    ata_read((size_t)argv[1], (size_t)argc[2]);
+  else
+    ata_write_sector(&ata_primary_master, (size_t)argv[1], argv[2]);
+}
+
+void ata_asread(int ata, int sect)
+{
+  struct thread x = thcreat(tproc, 512);
+  x.f = __ata_async;
+  thrunp(x, cthread);
 }
