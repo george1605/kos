@@ -39,7 +39,6 @@ struct kmap getmap(struct vfile u)
 
   if (u.mem >= KERN_MEM)
     i.perm = M_BOTH;
-
   return i;
 }
 
@@ -223,6 +222,23 @@ void sclose(struct stream *u)
   {
     free(u->buffer);
   }
+}
+
+struct vfile procmap(char* path, struct proc p)
+{
+  if(path == NULL_PTR)
+    path = "/home/proc/";
+
+  struct vfile x;
+  x.mem = p.stack;
+  x.fd = p.pid  + 0xFFFF00;
+  x.name = strcat(path, p.name);
+  return x;
+}
+
+void procunmap(struct vfile vf)
+{
+  free(vf.name);
 }
 
 char *drname(int drno)

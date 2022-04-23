@@ -6,11 +6,17 @@
 #define AVR_SYS 0
 #define MPC_SYS 1
 #define RPI_SYS 2
+#define INTR(x) __attribute__((interrupt(x)))
 typedef unsigned int dword;
 typedef unsigned short word;
 
-void setsys(int systype)
+#ifdef __ARM__
+
+void INTR("IRQ") inthnd()
 {
+    
 }
+
+#endif
 
 void __main_start();

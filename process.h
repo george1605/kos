@@ -2,6 +2,7 @@
 #include "ioapic.h"
 #include "smem.h"
 #include "cpuem.h"
+#define __PROC_UNSAFE static
 
 #define X86ENV 1
 #define ARMENV 2
@@ -93,7 +94,8 @@ void sleep(struct proc u)
 {
   struct sleeplock f = initsleep(u);
   while (f.proc.state != KILLED && f.proc.stack != 0)
-  { // waits to exit
+  { 
+    xchg((size_t*)&f.proc.state, (size_t)KILLED);
   }
   release(&f.lock);
 }
@@ -120,17 +122,6 @@ void pridle(struct proc u)
     u.state = PAUSED;
     asm volatile("pause");
   }
-}
-
-struct proc procid(int pid)
-{
-  int i;
-  for(i = 0;i < prlist.cnt;i++)
-    if(prlist.procs[i].pid == pid)
-      return prlist.procs[i];
-
-  struct proc t;
-  return t;
 }
 
 void endsleep(struct sleeplock u)
@@ -229,6 +220,27 @@ void prswap(struct proc u)
   HALT();
   tproc = u;
   u.f(0, (char **)0);
+}
+
+struct proc prnew(int pid)
+{
+  struct proc x;
+  x.pid = pid;
+  x.parent = tproc;
+  x.stack = alloc(0, 64);
+  x.state = STARTED;
+}
+
+struct proc procid(int pid) // if it doesn't find a process, it creates one
+{
+  int i;
+  for (i = 0; i < prlist.cnt; i++)
+    if (prlist.procs[i].pid == pid)
+      return prlist.procs[i];
+
+  struct proc t = prnew(pid);
+  prappend(t); // appends the new process to the list
+  return t;
 }
 
 void prsswap(struct proc prlist[], int procs)

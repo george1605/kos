@@ -117,6 +117,15 @@ uint8_t sum(uint8_t *addr, int len)
   return sum;
 }
 
+char* strcat(char* a1, char* a2)
+{
+  int y = strlen(a1), z = strlen(a2);
+  char* x = (char*)alloc(0, y + z + 1);
+  memcpy(x, a1, y);
+  memcpy(x + y,  a2, strlen(a2));
+  return x;
+}
+
 void write32(void *address, int value)
 {
   (*(volatile int *)(address)) = value;

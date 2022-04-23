@@ -2,6 +2,11 @@
 #include "pit.c"
 #include "time.h"
 #include "drivers/blockdev.h"
+#define TIMER0_SELECT 0x00
+#define TIMER1_SELECT 0x40
+#define TIMER2_SELECT 0x80
+#define WRITE_WORD 0x30
+#define MODE_SQUARE_WAVE 0x06
 extern int timer_secs;
 
 struct snddev
@@ -32,6 +37,12 @@ void speaker_play(size_t hz)
     {
         outportb(0x61, t | 0x3);
     }
+}
+
+void speaker_tone()
+{
+    outb(0x43, TIMER2_SELECT | WRITE_WORD | MODE_SQUARE_WAVE);
+    
 }
 
 void speaker_pause()
