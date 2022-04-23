@@ -35,6 +35,14 @@ void symadd(struct ElfToken x)
   symtable[symcnt++] = x;
 }
 
+void symrem(struct ElfToken x)
+{
+  int a = 0;
+  for (a = 0; a < 10; a++)
+    if (symtable[a].addr == x.addr)
+      symtable[a].addr = 0ULL;
+}
+
 func dlsym(char* name)
 {
   for(int a = 0;a < 10;a++)
@@ -145,7 +153,7 @@ void __ata_async(int argc, char** argv) // asynchronous IO
 {
   if(argc < 3) return;
   if(argv[0][0] == 'r')
-    ata_read((size_t)argv[1], (size_t)argc[2]);
+    ata_read((size_t)argv[1], (size_t)argv[2]);
   else
     ata_write_sector(&ata_primary_master, (size_t)argv[1], argv[2]);
 }
