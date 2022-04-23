@@ -5,13 +5,11 @@
 
 #define X86ENV 1
 #define ARMENV 2
+#define AVRENV 4
+#define X64ENV 8
 #define MAINENV 0x4BB0000
 #define SHUTDOWN 0x20
 #define RESTART 0x21
-
-#if is_x64()
-#define X64ENV 1
-#endif
 
 int lpid = 1;
 int glsig = 0;
@@ -43,7 +41,22 @@ struct proc
   int ssize;
   func f;
 } tproc, kproc;
-typedef struct proc* prqueue;
+
+struct prset
+{
+  struct proc* procs;
+  int cnt;
+  struct spinlock lock;
+} prlist;
+
+void prappend(struct proc u)
+{
+  while(prlist.lock.locked)
+    NOP();
+  acquire(&prlist.lock);
+  prlist.procs[++prlist.cnt] = u;
+  release(&prlist.lock);
+}
 
 struct sleeplock
 {
@@ -107,6 +120,17 @@ void pridle(struct proc u)
     u.state = PAUSED;
     asm volatile("pause");
   }
+}
+
+struct proc procid(int pid)
+{
+  int i;
+  for(i = 0;i < prlist.cnt;i++)
+    if(prlist.procs[i].pid == pid)
+      return prlist.procs[i];
+
+  struct proc t;
+  return t;
 }
 
 void endsleep(struct sleeplock u)
@@ -315,6 +339,8 @@ struct environ* envdef() // creates a default environment
   x->ctx = TALLOC(struct context);
   #ifdef __ARM__
     x->type = ARMENV;
+  #elif defined(__AVR__)
+    x->type = AVRENV;
   #else
     x->type = X86ENV;
   #endif
@@ -362,6 +388,22 @@ void envrun(struct environ *u, func f)
     return;
 
   f(1, (char **)u);
+}
+
+void envexec(struct environ* u, struct proc p)
+{
+  if(u == NULL_PTR)
+    return;
+  
+  fxsave(NULL_PTR); // saves the regs
+  pushctx(u->ctx);
+  tproc = p;
+  p.f(0, (char**)0);
+}
+
+void envrstor()
+{
+  fxrestor(NULL_PTR);
 }
 
 struct isolate

@@ -83,6 +83,14 @@ void _fclose(FILE* x)
     fclose(*x);
 }
 
+int fileno(FILE* f)
+{
+  if(f == NULL_PTR)
+    return -1;
+  
+  return f->fd;
+}
+
 #define STACK(type)  struct stack_ ## type { \
                       type* buffer;         \
                       int size;  \
@@ -94,7 +102,4 @@ void _fclose(FILE* x)
                       int size;  \
                       int pos;         \
                      }
-<<<<<<< HEAD
 
-=======
->>>>>>> ad040972e43d7dda8bf8b149237775b1a2185319
