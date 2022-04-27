@@ -226,7 +226,7 @@ struct proc prnew(int pid)
 {
   struct proc x;
   x.pid = pid;
-  x.parent = tproc;
+  x.parent = &tproc;
   x.stack = alloc(0, 64);
   x.state = STARTED;
 }
@@ -241,6 +241,15 @@ struct proc procid(int pid) // if it doesn't find a process, it creates one
   struct proc t = prnew(pid);
   prappend(t); // appends the new process to the list
   return t;
+}
+
+void waitpid(int pid)
+{
+  struct proc u = procid(pid);
+  while(u.state == KILLED)
+  {
+    prswap(tproc);
+  }
 }
 
 void prsswap(struct proc prlist[], int procs)
@@ -265,7 +274,15 @@ void prkill(struct proc u)
     u.state = KILLED;
     u.pid = 0;
     free((int *)u.stack);
+    (&u)->stack = NULL_PTR;
   }
+}
+
+void prclear(struct proc u)
+{
+  int i = 0;
+  while (prlist.procs[i].stack != NULL_PTR)
+    prkill(prlist.procs[i]), i++;
 }
 
 void prend(struct proc u, int status)
@@ -328,6 +345,12 @@ void readctx(struct context *ctx)
                  : "=r"(ctx->esi)
                  : "r"(ctx->esi));
   }
+}
+
+void fcall(uint64_t addr, struct context* x)
+{
+  pushctx(x);
+  asm volatile("jmp %0" : : "r"(addr));
 }
 
 void pushregs()

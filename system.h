@@ -8,6 +8,7 @@
 #include "vfs.h"
 #include "user.h"
 #include "pci.h"
+#define __SYSCALL 
 #define PORTMAX 0xFFFF
 #define SYSRES 0xC0DEBA5E /* system reserved space */
 int usermode = 0;
@@ -49,25 +50,25 @@ struct eptr
   void *esp;
 };
 
-int sys_int(void *arg1)
+int __SYSCALL sys_int(void *arg1)
 {
   if (arg1 != 0)
     return *(int *)arg1;
 }
 
-void sys_sleep()
+void __SYSCALL sys_sleep()
 {
   outw(PM1a_CNT, SLP_TYPa | SLP_EN);
 }
 
-struct rtcdate *sys_time()
+struct rtcdate * __SYSCALL sys_time()
 {
   struct rtcdate *u = (struct rtcdate *)0xDDFF00;
   filldate(u);
   return u;
 }
 
-void sys_exec(void *arg1, void *arg2)
+void __SYSCALL sys_exec(void *arg1, void *arg2)
 {
   if (arg1 != 0)
   {
@@ -79,7 +80,7 @@ void sys_exec(void *arg1, void *arg2)
   }
 }
 
-void sys_open(void *arg1, void *arg2)
+void __SYSCALL sys_open(void *arg1, void *arg2)
 {
   struct vfile vf;
   struct file fil;
@@ -87,18 +88,25 @@ void sys_open(void *arg1, void *arg2)
   vf = vfsopen(arg1);
 }
 
-void sys_mkdir(void *arg1, void *arg2)
+void __SYSCALL sys_mkdir(void *arg1, void *arg2)
 {
   char *dname = (char *)arg1;
   struct file *parent = (struct file *)arg2;
   mkdir(dname, parent);
 }
 
-void sys_write(void *arg1, void *arg2)
+void __SYSCALL sys_write(void *arg1, void *arg2)
 {
   struct buf *a = (struct buf *)arg2;
   a->flags = B_DIRTY;
   _write(sys_int(arg1), a, 512);
+}
+
+void __SYSCALL sys_read(void* arg1, void* arg2)
+{
+  struct buf *a = (struct buf *)arg2;
+  a->flags = B_VALID;
+  _read(sys_int(arg1), a, 512);
 }
 
 void sysc_handler(struct regs *r)
@@ -276,12 +284,12 @@ struct file getfile(char *name)
   return u;
 }
 
-void sys_abort()
+void __SYSCALL sys_abort()
 {
   prkill(tproc);
 }
 
-uint32_t sys_memsz()
+uint32_t __SYSCALL sys_memsz()
 { 
   uint32_t total;
   uint16_t lowmem, highmem;
@@ -305,7 +313,7 @@ void setcore(uint64_t base)
                : "c"(0xc0000102), "d"((uint32_t)(base >> 32)), "a"((uint32_t)(base & 0xFFFFFFFF)));
 }
 
-struct proc sys_execv(char *path, char *argv[])
+struct proc __SYSCALL sys_execv(char *path, char *argv[])
 {
   int argc = 0;
   while (argv[argc] != 0)
@@ -344,11 +352,25 @@ struct _rmem
   int n;
 } rmtable;
 
-void sys_prwait(struct proc u)
+void __SYSCALL sys_prwait(struct proc u)
 {
+  
 }
 
-void sys_resmem(void *mem, int size)
+void __SYSCALL sys_fcall(uint64_t addr, void* _regs) 
+{
+  struct context* u = (struct context*)_regs;
+  if(u == NULL_PTR)
+    return;
+  if(addr == (uint64_t)_write) // cannot execute a function that is not a syscall
+    fcall((uint64_t)sys_write, u);
+  else if(addr == (uint64_t)_read) // prevents corrupting the FS
+    fcall((uint64_t)sys_read, u);
+  else
+    fcall(addr, u);
+}
+
+void __SYSCALL sys_resmem(void *mem, size_t size)
 {
   struct rmentry i;
   int *ptr = mem;
