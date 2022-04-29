@@ -86,6 +86,47 @@ struct filelock
   struct file file;
 };
 
+struct ftable loadtbl(int ide)
+{
+  struct buf* b = TALLOC(struct buf);
+  b->blockno = 2;
+  b->flags = B_VALID;
+  bread(b, 0);
+  struct ftable ft;
+  memcpy(&ft, b->data, 64);
+  free(b);
+  return ft;
+}
+
+int savetbl(int ide, struct ftable* ft)
+{
+  if(ft == NULL) return -1;
+  struct buf *b = TALLOC(struct buf);
+  b->blockno = 2;
+  b->flags = B_DIRTY;
+  memcpy(b->data, ft, sizeof(*ft));
+  int p = bwrite(b, 0);
+  free(b);
+  return p;
+}
+
+void unveil(const char *path, int perm)
+{
+  struct ftable ft = loadtbl(0);
+  int found = 0, c = 0;
+
+  while(!found)
+  {
+    if(strcmp(ft.files[c].name, path) == 0)
+      ft.files[c].flags = perm, break;
+
+    c++;
+  }
+
+  if(savetbl(0, &ft) == -1)
+    perror("FileTable could not be saved!");
+}
+
 struct fopener // useful for the 'Open With' actions
 {
   char* name;

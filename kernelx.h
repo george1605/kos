@@ -164,3 +164,15 @@ void ata_asread(int ata, int sect)
   x.f = __ata_async;
   thrunp(x, cthread);
 }
+
+void shrmem(char* phys, struct proc procs[2])
+{
+  enable_paging(0x1F000000);
+  procs[0].stack = map_page(phys, phys + rand(), 0);
+  procs[1].stack = map_page(phys, phys + rand(), 0);
+}
+
+void unshrmem(char* phys)
+{
+  tlb_flush(0x1F000000);
+}
