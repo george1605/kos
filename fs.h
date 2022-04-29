@@ -118,10 +118,13 @@ void unveil(const char *path, int perm)
   while(!found)
   {
     if(strcmp(ft.files[c].name, path) == 0)
-      ft.files[c].flags = perm, break;
+      ft.files[c].flags = perm, found = 1;
 
     c++;
   }
+
+  if(!found)
+    perror("File not found!");
 
   if(savetbl(0, &ft) == -1)
     perror("FileTable could not be saved!");
