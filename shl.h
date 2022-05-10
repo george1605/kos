@@ -65,5 +65,11 @@ void shladd(shlsym u, struct buf *b, int offset)
 shlsym shlload(struct buf *b, int offset)
 {
 	shlsym i;
+	if(b->data[0] == 0)
+		bread(b, 0);
+
+	i.name = b->data + 4;
+	i.type = bcasti(b->data, 16); // 12 bytes
+	i.value = (void*)(b->data + 20);
 	return i;
 }

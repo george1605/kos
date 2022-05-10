@@ -63,3 +63,24 @@ void loadtask(){
   int __ignore;
   asm("mov %0, %%ax; ltr %ax":"=r"(__ignore):"r"(0x28));
 }
+
+struct ptask {
+  int priot;
+  int pid;
+  int flags;
+  void(*f)();
+  void* ctx;
+} *ptasks;
+
+void psched()
+{
+  int a, max = -100;
+  for(a = 0;ptasks[a].pid != 0;a++)
+  {
+    if(ptasks[a].priot > max)
+    { 
+      max = ptasks[a].priot;
+      ptasks[a].f();
+    }
+  }
+}

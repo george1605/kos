@@ -288,3 +288,16 @@ void enable_interrupt(int bus, int slot, int funcs)
 { 
 	pciwrites(bus, slot, funcs, 0x4, pciread(bus, slot, funcs, 0x4) & (~PCI_CMD_INTERRUPT_DISABLE)); 
 }
+
+inline size_t pci_baseaddr(uint8_t idx, struct pcidev dev)
+{
+	if(idx < 0 || idx > 5) return -1; 
+
+	size_t bar = pciread(dev.bus, dev.slot, dev.func, 0x10 + (idx * sizeof(uint32_t)));
+	if (!(bar & 0x1)  && bar & 0x4  && idx < 5)
+	{
+		bar |= (size_t)(pciwrites(dev.bus, dev.slot, dev.func, 0x10 + ((bar + 1) * sizeof(uint32_t)))) << 32;
+	}
+
+	return (bar & 0x1) ? (bar & 0xFFFFFFFFFFFFFFFC) : (bar & 0xFFFFFFFFFFFFFFF0);
+}
