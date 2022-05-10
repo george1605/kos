@@ -96,3 +96,11 @@ void thexit(){
     fclose(cthread.ofiles[c]), c++;
     
 }
+
+void lockinc()
+{
+  asm volatile(
+    "lock;"
+    "incl (%eax)"
+  );
+}
