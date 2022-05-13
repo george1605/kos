@@ -80,6 +80,15 @@ void ttystart()
   systty[0] = ttymap("/home/tty/tty0.con", 0);
 }
 
+void ttyswap(int x, int y)
+{
+  if(x >= MAXTTY || y >= MAXTTY) return;
+  struct ttydev n;
+  n = ttys[y]; // swaps
+  ttys[x] = n;
+  ttys[y] = ttys[x]; 
+}
+
 void ttyset(size_t num, struct blkdev *dev)
 {
   ttys[num].device = dev;

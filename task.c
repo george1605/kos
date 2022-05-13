@@ -72,6 +72,14 @@ struct ptask {
   void* ctx;
 } *ptasks;
 
+#ifdef __ARM__
+void pload()
+{
+  asm volatile("STMFD  r13!, {r0-r5}");
+}
+
+#endif
+
 void psched()
 {
   int a, max = -100;
