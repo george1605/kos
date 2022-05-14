@@ -489,7 +489,6 @@ int islrun(struct isolate i)
   return p;
 }
 
-
 struct atomic
 {
   struct spinlock alock; // lock for writing

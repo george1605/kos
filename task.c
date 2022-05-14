@@ -64,13 +64,52 @@ void loadtask(){
   asm("mov %0, %%ax; ltr %ax":"=r"(__ignore):"r"(0x28));
 }
 
-struct ptask {
+struct ptask 
+{
   int priot;
   int pid;
   int flags;
   void(*f)();
   void* ctx;
 } *ptasks;
+
+struct appinfo
+{
+  int pid;
+  int ppid;
+  long memusg;
+  size_t instr;
+};
+
+void* proc_alloc(struct proc n, int size, struct appinfo* inf)
+{
+  if(n.state == KILLED || inf == NULL_PTR)
+    return;
+  void *x = alloc(0, size);
+  inf->memusg += size;
+  inf->pid = n.pid;
+  return x;
+}
+
+void proc_free(void* mem, int size, struct appinfo* inf)
+{
+  if(*(int*)(mem + size) != 0)
+    return;
+  inf->memusg -= size;
+}
+
+void* __alloc(int size)
+{
+  struct appinfo t = {0};
+  return proc_alloc(tproc, size, &t);
+}
+
+void __free(void* x)
+{
+  int n = strlen(x);
+  struct appinfo t = {0};
+  proc_free(x, n, &t);
+}
 
 #ifdef __ARM__
 void pload()
