@@ -306,3 +306,17 @@ void *ioremap(void* x, size_t len)
   *(char*)y = 0xA0;
   return y;
 }
+
+void* newheap(int size)
+{
+  void* x = dyalloc(size + 0x10000);
+  *(int*)(x - 1) = size;
+  *(int*)x = 0xCD;
+  return x;
+}
+
+void freeheap(void* heap)
+{
+  int size = *(int*)(heap - 1);
+  memset(heap, 0, size);
+}
