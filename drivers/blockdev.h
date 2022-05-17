@@ -4,6 +4,7 @@
 #include "../lib.c"
 #include "../mem.h"
 #include "../uart.c"
+#define __b64
 #define MAINPORT 0
 #define STATUSPORT 1
 
@@ -214,6 +215,12 @@ char *blkreads(struct blkdev *_Block)
     return readio(_Block->portno);
 }
 
+void blkreadx(struct blkdev* _Block, void* __b64 mem)
+{
+  if(mem == NULL_PTR || *(mem + 64) != 0) return;
+  insl(_Block->portno, mem, 63);
+}
+
 void blkwait(struct blknode _Node)
 {
   while (_Node.active)
@@ -230,4 +237,47 @@ void blkwrites(struct blkdev *_Block, char *bytes)
 {
   if (_Block->lock.locked != 1)
     writeio(bytes, _Block->portno);
+}
+
+struct iocount
+{
+  int reads;
+  int writes;
+  size_t tr_read;
+  size_t tr_write;
+};
+
+void io_outb(int port, char byte, struct iocount* cnt)
+{
+  outb(port, byte);
+  cnt->writes++;
+  cnt->tr_write += 1;
+}
+
+uint8_t io_inb(int port, struct iocount* cnt)
+{
+  uint8_t val = inb(port);
+  cnt->reads++;
+  cnt->tr_read += 1;
+  return val;
+}
+
+void io_blkw(struct blockdev* d, void* mem, struct iocount* cnt) // blockdev write
+{
+  if(mem == NULL_PTR)
+    return;
+
+  blkwrites(d, (char*)mem);
+  cnt->tr_write += strlen(mem);
+  cnt->writes++;
+}
+
+void io_blkr(struct blockdev *d, void *mem, struct iocount *cnt)
+{
+  if (mem == NULL_PTR)
+    return;
+
+  blkreadx(d, mem);
+  cnt->tr_read += strlen(mem);
+  cnt->writes++;
 }
