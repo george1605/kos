@@ -1,10 +1,12 @@
 #pragma once
-#include "lib.c"
+// Let's use the syscalls
+#include "system.h"
 #include "fs.h"
 #include "time.c"
 
 #define NULL NULL_PTR
-#define RAND_MAX (1 << 32) - 1
+#define RAND_MAX ((1 << 31) - 1)
+#define RAND_MIN -RAND_MAX - 1
 #define TRUE 1
 #define FALSE 0
 #define bitor |
@@ -15,6 +17,11 @@
 typedef uint32_t time_t;
 typedef uint64_t xtime_t; // extended UNIX Time
 typedef struct file FILE;
+
+FILE stdfiles[3];
+#define stdin &stdfiles[0]
+#define stdout &stdfiles[1]
+#derine stderr &stdfiles[2]
 
 time_t time(int k){
   if(k < 0)
