@@ -22,7 +22,13 @@ struct drivobj {
   void(*unload)();
 };
 
-typedef void(*drentry)(struct drivobj& u); //just setup the drivobj
+struct driv // more like linux modules
+{
+  void(*mod_init)();
+  void(*mod_exit)();
+};
+
+typedef void(*drentry)(struct drivobj* u); //just setup the drivobj
 
 struct drivlist
 {
@@ -48,7 +54,7 @@ void drexec(drentry k){
 
 void drrun(void* u){
   if(u != 0 && *u != 0 && *(u-1) == 0xFEEDC0DE){
-   drentry k = (drentry)(*u);
+   drentry k = *(drentry*)(u);
    drexec(k);
   }
 }

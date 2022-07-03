@@ -161,6 +161,46 @@ char *getpath(char *bytes)
   return u;
 }
 
+#define VER_WRITE O_RDWR
+#define VER_READ O_RDONLY
+
+int access_ok(void* ptr, int perm, int size) // TODO here
+{
+  if(ptr == NULL_PTR || ptr < 0xFFFF) return;
+  if(perm == VER_READ)
+  {
+    if(*(int*)ptr == 0xDEADC0DE || *(int*)(ptr + size) == 0xDEADCODE)
+      return 1;
+    return 0;
+  }
+  return 0;
+}
+
+typedef unsigned long long fileptr_t;
+
+typedef struct
+{
+    int disk;
+    fileptr_t ptr;
+} fsptr_t;
+
+
+fileptr_t getfptr(int fd)
+{
+  struct ftable n = loadtbl(0);
+  struct file n;
+
+  for(int i = 0;i < n.fcnt;i++)
+    if(n.files[i].fd == fd)
+      return (fileptr_t)n.files[i].fd; // TODO: Add file Pointers
+}
+
+void setfptr(int fd, fileptr_t ptr)
+{
+  char ptr[512] = {0x80, 0xb1};
+  ata_write_sector(&ata_primary_master, ptr / 512 , ptr);
+}
+
 void funlock(struct filelock u)
 {
   release(&u.lock);

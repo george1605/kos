@@ -209,6 +209,14 @@ char *blkread(struct blknode _Node)
     return readio(_Node.dev->portno);
 }
 
+char blkgetc(struct blknode _Node)
+{
+  if(_Node.dev->portno == -1) // is a null dev 
+    return (char)-1;
+  
+  return inb(_Node.dev->port);
+}
+
 char *blkreads(struct blkdev *_Block)
 {
   if (_Block != 0 && _Block->lock.locked != 1)
@@ -221,10 +229,15 @@ void blkreadx(struct blkdev* _Block, void* __b64 mem)
   insl(_Block->portno, mem, 63);
 }
 
+int blkstate(struct blknode _Node)
+{
+  return (blkgetc(_Node) != 0);
+}
+
 void blkwait(struct blknode _Node)
 {
-  while (_Node.active)
-    ;
+  while (_Node.active = blkstate(_Node));
+  // sets the value to _Node.active and waits for the change
 }
 
 void blkwrite(struct blknode _Node, char *bytes)
