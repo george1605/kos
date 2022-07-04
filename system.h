@@ -8,7 +8,7 @@
 #include "vfs.h"
 #include "user.h"
 #include "pci.h"
-#define __SYSCALL 
+#define __SYSCALL static inline 
 #define PORTMAX 0xFFFF
 #define SYSRES 0xC0DEBA5E /* system reserved space */
 int usermode = 0;
@@ -50,25 +50,25 @@ struct eptr
   void *esp;
 };
 
-int __SYSCALL sys_int(void *arg1)
+__SYSCALL int sys_int(void *arg1)
 {
   if (arg1 != 0)
     return *(int *)arg1;
 }
 
-void __SYSCALL sys_sleep()
+__SYSCALL void sys_sleep()
 {
   outw(PM1a_CNT, SLP_TYPa | SLP_EN);
 }
 
-struct rtcdate * __SYSCALL sys_time()
+__SYSCALL struct rtcdate * sys_time()
 {
   struct rtcdate *u = (struct rtcdate *)0xDDFF00;
   filldate(u);
   return u;
 }
 
-void __SYSCALL sys_exec(void *arg1, void *arg2)
+__SYSCALL void sys_exec(void *arg1, void *arg2)
 {
   if (arg1 != 0)
   {
@@ -80,7 +80,7 @@ void __SYSCALL sys_exec(void *arg1, void *arg2)
   }
 }
 
-void __SYSCALL sys_open(void *arg1, void *arg2)
+__SYSCALL void sys_open(void *arg1, void *arg2)
 {
   struct vfile vf;
   struct file fil;
@@ -88,21 +88,21 @@ void __SYSCALL sys_open(void *arg1, void *arg2)
   vf = vfsopen(arg1);
 }
 
-void __SYSCALL sys_mkdir(void *arg1, void *arg2)
+__SYSCALL void sys_mkdir(void *arg1, void *arg2)
 {
   char *dname = (char *)arg1;
   struct file *parent = (struct file *)arg2;
   mkdir(dname, parent);
 }
 
-void __SYSCALL sys_write(void *arg1, void *arg2)
+__SYSCALL void sys_write(void *arg1, void *arg2)
 {
   struct buf *a = (struct buf *)arg2;
   a->flags = B_DIRTY;
   _write(sys_int(arg1), a, 512);
 }
 
-void __SYSCALL sys_read(void* arg1, void* arg2)
+__SYSCALL void sys_read(void* arg1, void* arg2)
 {
   struct buf *a = (struct buf *)arg2;
   a->flags = B_VALID;
