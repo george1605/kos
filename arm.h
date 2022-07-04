@@ -50,9 +50,9 @@ static inline u16 __readw(const volatile void* addr)
 
 struct armregs 
 {
-  uint8_t r0, r1, r2;
+  uint8_t r0, r1, r2, r3;
+  uint8_t r4, r5;
   size_t pc, lr, sp;
-};
 };
 
 #define FORCE_REG(x, y) register uint8_t x asm(y)
