@@ -85,9 +85,9 @@ void _fclose(FILE *x)
   }
 }
 
-FILE* _fopen(char* name, char* mod)
+void _fread(void* buf, int size, int cnt, FILE* PTR)
 {
-  return NULL;
+   
 }
 
 void _fclose(FILE* x)
