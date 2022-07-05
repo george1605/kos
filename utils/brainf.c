@@ -1,7 +1,7 @@
 #pragma once
 #include "../stdlib.c"
 static char memory[30000];
-static char* filename = "output.txt";
+static char* filename = "/home/bf/output.txt";
 int cell = 0, bracket_flag = 0; 
 
 // writes character to file 
@@ -23,7 +23,7 @@ void bfexec(char* s) {
      case '-':
       memory[cell]--; break;
      case ',':
-      scanf("%c",&memory[cell]);
+        memory[cell] = getc();
      case '.':
       if(memory[cell] < 32)
         printf("%i",memory[cell]);
@@ -59,8 +59,15 @@ void bfexec(char* s) {
     c++;
   }
   fclose(bffile);
-  printf("\n");
+  puts("\n");
 }
 
-int main()
-{}
+int main(int argc, char** argv)
+{
+  if(argc <= 1) 
+   return 1;
+  
+  if(strcmp(argv[1], "-s") == 0)
+   bfexec(argv[2]);
+  return 0;
+}
