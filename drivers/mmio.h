@@ -18,6 +18,8 @@ struct pin {
     long mmio;
 };
 
+static uint8_t* pin_status;
+
 struct vport { // virtual port
     int num;
     char stack[8];
@@ -50,10 +52,18 @@ unsigned int pin_read(struct pin u){
     return MMIO_R(u.mmio);
 }
 
-struct pin pin_init(int n){
+static struct pin pin_init(int n){
   struct pin u;
   u.active = 1;
   u.mmio = GPIO_BASE + 0x4 * n;
   u.num = n;
   return u;
+}
+
+void pin_request(int n)
+{
+  if(pin_status[n] == 1)
+   iowait(0);
+  else
+   pin_status[n] = 1;
 }
