@@ -130,6 +130,11 @@ void unveil(const char *path, int perm)
     perror("FileTable could not be saved!");
 }
 
+void free_fd(int fd)
+{
+
+}
+
 struct fopener // useful for the 'Open With' actions
 {
   char* name;
@@ -169,7 +174,7 @@ int access_ok(void* ptr, int perm, int size) // TODO here
   if(ptr == NULL_PTR || ptr < 0xFFFF) return;
   if(perm == VER_READ)
   {
-    if(*(int*)ptr == 0xDEADC0DE || *(int*)(ptr + size) == 0xDEADCODE)
+    if(*(int*)ptr == 0xDEADC0DE || *(int*)(ptr + size) == 0xDEADC0DE)
       return 1;
     return 0;
   }
@@ -195,10 +200,13 @@ fileptr_t getfptr(int fd)
       return (fileptr_t)n.files[i].fd; // TODO: Add file Pointers
 }
 
-void setfptr(int fd, fileptr_t ptr)
+void setfptr(int fd, fileptr_t x)
 {
   char ptr[512] = {0x80, 0xb1};
-  ata_write_sector(&ata_primary_master, ptr / 512 , ptr);
+  int _f = fd;
+
+  memcpy(ptr + 3, &_f, sizeof(_f));
+  ata_write_sector(&ata_primary_master, x / 512 , ptr);
 }
 
 void funlock(struct filelock u)

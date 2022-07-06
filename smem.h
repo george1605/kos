@@ -265,15 +265,15 @@ void freerange(void *from, void *to)
   }
 }
 
-void map_page(void* physaddr, void* virtualaddr, size_t flags) 
+void* map_page(void* physaddr, void* virtualaddr, size_t flags) 
 {
-
     uint64_t pdindex = (uint64_t)virtualaddr >> 22;
     uint64_t ptindex = (uint64_t)virtualaddr >> 12 & 0x03FF;
 
     uint64_t* pd = (uint64_t*)0xFFFFF000;
     uint64_t* pt = ((uint64_t*)0xFFC00000) + (0x400 * pdindex);
     pt[ptindex] = ((uint64_t)physaddr) | (flags & 0xFFF) | 0x01; 
+    return virtualaddr;
 }
 
 void *get_phys(void *virtualaddr)
@@ -290,7 +290,7 @@ void *get_phys(void *virtualaddr)
 void enable_paging(uint64_t address)
 {
   int __ignore;
-  asm volatile("movl %0, %%cr3":"r"(address), "r"(__ignore));
+  asm volatile("movl %0, %%cr3":"r"(address), "=r"(__ignore));
 }
 
 static inline void tlb_flush(unsigned long addr) // invalidates a page

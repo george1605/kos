@@ -80,12 +80,13 @@ __SYSCALL void sys_exec(void *arg1, void *arg2)
   }
 }
 
-__SYSCALL void sys_open(void *arg1, void *arg2)
+__SYSCALL int sys_open(void *arg1, void *arg2)
 {
   struct vfile vf;
   struct file fil;
 
   vf = vfsopen(arg1);
+  return vf.fd;
 }
 
 __SYSCALL void sys_mkdir(void *arg1, void *arg2)
@@ -107,6 +108,13 @@ __SYSCALL void sys_read(void* arg1, void* arg2)
   struct buf *a = (struct buf *)arg2;
   a->flags = B_VALID;
   _read(sys_int(arg1), a, 512);
+}
+
+__SYSCALL void sys_rem(int fd)
+{
+  if(fd <= 3) // cannot remove stdin/stdout
+    return;
+  setfptr(fd, NULL_PTR); // just sets the filepointer to NULL
 }
 
 void sysc_handler(struct regs *r)
@@ -131,6 +139,8 @@ void sysc_handler(struct regs *r)
   case 0x12:
     outb(r->ebx, r->err_code);
     break;
+  case 0x13:
+    sys_rem(r->eax);
   }
 }
 
