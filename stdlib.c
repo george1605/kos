@@ -126,6 +126,18 @@ int fileno(FILE* f)
   return f->_fd;
 }
 
+void printf(const char* format, void* args)
+{
+  int i;
+  for(i = 0;format[i] != 0;i++)
+  {
+    if(format[i] != '%' && format[i+1] != 'i')
+      putch(format[i]);
+    else
+      puts(atoi(args[0]));
+  }
+}
+
 #define STACK(type)  struct stack_ ## type { \
                       type* buffer;         \
                       int size;  \
