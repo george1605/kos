@@ -8,6 +8,8 @@
 #include "../lib.c"
 #include "../mutex.h"
 #include "../gui.c"
+#include "../time.c"
+
 #define IN
 #define OUT
 #define OPTIONAL
@@ -16,7 +18,7 @@
  #define __WINC__ 2
 #endif
 #define STD_API(a) a
-typedef int COLORREF;
+typedef unsinged int COLORREF;
 #define RGB(_r,_g,_b) (COLORREF)((_r) | (_g << 8) | (_b << 16))
 
 typedef char BYTE;
@@ -35,6 +37,8 @@ typedef char* LPSTR;
 typedef wchar_t* LPWSTR;
 typedef long NTSTATUS;
 typedef NTSTATUS KSTATUS;
+typedef unsigned short ATOM;
+typedef DWORD ACCESS_MASK;
 
 typedef void* PVOID;
 typedef void* HANDLE;
@@ -105,14 +109,14 @@ NTSTATUS NtCreateTimer(
   IN  TIMER_TYPE TimerType
 )
 {
-  size_t* t = alloc(0,4);
+  size_t* t = alloc(0,8);
   TimerHandle[0] = (void*)t;
+  *t = readtsc();
   return 0;
 }
 
 void NtCancelTimer(PHANDLE TimerHandle, int* CurrentState)
 {
-
   free(TimerHandle[0]); //frees the memory
 }
 
@@ -126,7 +130,6 @@ HBRUSH CreateSolidBrush(COLORREF lpColor)
 HANDLE NtCreateFile()
 {
     return (HANDLE)0;
-
 }
 
 void DbgPrint(const char* string)
@@ -181,10 +184,32 @@ NTSTATUS NtCreateEvent(PHANDLE EventHandle, ACCESS_MASK DesiredAccess,
 
 HWND GetConsoleWindow(void)
 {
-
+  HWND x = alloc(0, 8);
+  *(int*)x = 0;
+  return x;
 }
 
 DWORD GetLastError()
 {
   return (DWORD)errno;
 }
+
+typedef struct tagRECT {
+  LONG left;
+  LONG top;
+  LONG right;
+  LONG bottom;
+} RECT;
+
+typedef struct tagWINDOWINFO {
+  DWORD cbSize;
+  RECT  rcWindow;
+  RECT  rcClient;
+  DWORD dwStyle;
+  DWORD dwExStyle;
+  DWORD dwWindowStatus;
+  UINT  cxWindowBorders;
+  UINT  cyWindowBorders;
+  ATOM  atomWindowType;
+  WORD  wCreatorVersion;
+} WINDOWINFO, *PWINDOWINFO, *LPWINDOWINFO;
