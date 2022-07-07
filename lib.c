@@ -557,6 +557,19 @@ static inline size_t readeflags()
   return eflags;
 }
 
+static void set_iopl(char x, char y)
+{
+  size_t i = readeflags();
+  i |= (x << 12);
+  i |= (y << 13);
+  asm volatile ("mov %0, %%eflags","r"(i));
+}
+
+void iopriv()
+{
+  set_iopl(1,1);
+}
+
 void wset(wchar_t *wch, char chrs[2])
 {
   if (wch != 0)
@@ -615,9 +628,9 @@ int memcmp(char *str1, char *str2)
 
 int strcmp(char *str1, char *str2)
 {
-  if (str1 != 0 && str2 != 0)
-    return memcmp(str1, str2);
-  return ERR_INVSTR;
+  if (str1 == 0 || str2 == 0)
+    return ERR_INVSTR;
+  return memcmp(str1, str2);
 }
 
 struct unistr
