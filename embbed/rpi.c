@@ -1,5 +1,8 @@
 #pragma once
 #include "../lib.c"
+#undef NOP
+#undef ASMV
+#undef HALT
 #define RPI_RLIMIT (1 << 30)
 static size_t MMIO_BASE;
  
