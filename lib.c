@@ -150,18 +150,12 @@ int read16(void *address)
 
 int min(int a, int b)
 {
-  if (a < b)
-    return a;
-  else
-    return b;
+  return a * (a <= b) + b * (b < a);
 }
 
 int max(int a, int b)
 {
-  if (a > b)
-    return a;
-  else
-    return b;
+  return a * (a >= b) + b * (b > a);
 }
 
 void swap(int a, int b)
