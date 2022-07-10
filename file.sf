@@ -1,5 +1,5 @@
 nasm -f elf32 -o loader.o boot.asm
-gcc -m32 -o kernel.o -c kernel.c -nostdlib -nostartfiles -nodefaultlibs
+gcc -m32 -o kernel.o -c kernel.c -nostdlib -nostartfiles -nodefaultlibs -D_X86_
 ld -T linker.ld -m elf_i386 -o momo.bin loader.o kernel.o
 qemu-system-i386 -kernel momo.bin
 
