@@ -19,7 +19,9 @@ void api_init()
 void api_call(int num, void* args)
 {
   if(num >= 16 || args == 0)
-    api_list[num](call);
+   return;
+  iopriv(); // gives iopriv
+  api_list[num](call);
 }
 
 struct sfile
