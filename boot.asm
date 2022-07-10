@@ -444,6 +444,9 @@ graphics:
     int 0x10
 
 loader:
+    call check_a20
+    cmp ax, 00
+    je enable_A20
     call kernel_main
     cli
 
@@ -454,3 +457,103 @@ quit:
 slock:
     cmp dx, 1; if it is locked
     je slock
+    
+global enable_a20
+global a20wait
+global a20wait2
+enable_A20:
+        cli
+ 
+        call    a20wait
+        mov     al,0xAD
+        out     0x64,al
+ 
+        call    a20wait
+        mov     al,0xD0
+        out     0x64,al
+ 
+        call    a20wait2
+        in      al,0x60
+        push    eax
+ 
+        call    a20wait
+        mov     al,0xD1
+        out     0x64,al
+ 
+        call    a20wait
+        pop     eax
+        or      al,2
+        out     0x60,al
+ 
+        call    a20wait
+        mov     al,0xAE
+        out     0x64,al
+ 
+        call    a20wait
+        sti
+        ret
+ 
+a20wait:
+        in      al,0x64
+        test    al,2
+        jnz     a20wait
+        ret
+ 
+ 
+a20wait2:
+        in      al,0x64
+        test    al,1
+        jz      a20wait2
+        ret
+        
+global check_a20
+global check_20__exit
+check_a20:
+    pushf
+    push ds
+    push es
+    push di
+    push si
+ 
+    cli
+ 
+    xor ax, ax
+    mov es, ax
+ 
+    not ax ; ax = 0xFFFF
+    mov ds, ax
+ 
+    mov di, 0x0500
+    mov si, 0x0510
+ 
+    mov al, byte [es:di]
+    push ax
+ 
+    mov al, byte [ds:si]
+    push ax
+ 
+    mov byte [es:di], 0x00
+    mov byte [ds:si], 0xFF
+ 
+    cmp byte [es:di], 0xFF
+ 
+    pop ax
+    mov byte [ds:si], al
+ 
+    pop ax
+    mov byte [es:di], al
+ 
+    mov ax, 0
+    je check_a20__exit
+ 
+    mov ax, 1
+    ret
+ 
+check_a20__exit:
+    pop si
+    pop di
+    pop es
+    pop ds
+    popf
+ 
+    ret
