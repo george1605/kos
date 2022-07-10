@@ -21,3 +21,16 @@ void api_call(int num, void* args)
   if(num >= 16 || args == 0)
     api_list[num](call);
 }
+
+struct sfile
+{
+  int fd;
+  struct fileops* ops;
+};
+
+void api_regster(struct fileops f, char* name)
+{
+  struct sfile f;
+  f.ops = TALLOC(struct fileops);
+  *f.ops = f;
+}
