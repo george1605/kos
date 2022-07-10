@@ -61,6 +61,7 @@ int imod2(int x, int y)
   return x;
 }
 
+#ifdef _X86_
 f64 sin(f64 x)
 {
   f64 result;
@@ -69,6 +70,7 @@ f64 sin(f64 x)
       : "0"(x));
   return result;
 }
+#endif
 
 int overflow(size_t *ptr)
 { // checks for overflow
@@ -200,12 +202,14 @@ void getebp(struct taskstate *u)
   u->ebp = (size_t)getframe();
 }
 
+#ifdef _X86_
 void tssreadax(struct taskstate *u)
 {
   asm volatile("movl %%eax, %1"
                : "=r"(u->eax)
                : "r"(u->eax));
 }
+#endif
 
 struct cpu
 {
@@ -233,6 +237,7 @@ void initlock(struct spinlock *u, char *name)
   u->name = name;
 }
 
+#ifdef _X86_
 inline size_t xchg(volatile size_t *addr, size_t newval)
 {
   size_t result;
@@ -242,6 +247,7 @@ inline size_t xchg(volatile size_t *addr, size_t newval)
                : "cc");
   return result;
 }
+#endif
 
 void acquire(struct spinlock *u)
 {
