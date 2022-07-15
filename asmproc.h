@@ -43,7 +43,7 @@ void protend(void* n, struct proc u)
 
 void protexec(struct proc u)
 {
-  protmode(u);
+  void* x = protmode(u);
   prswap(u);
-  protend(u);
+  protend(x, u);
 }
