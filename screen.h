@@ -215,3 +215,10 @@ int viddetect(void){
   return (vidgetinfo() & 0x30);
 }
 
+struct vscreen
+{
+   int s_pid; 
+   int s_fd; // allocated file descriptor
+   uint16_t s_width, s_height;
+   void* s_mem;
+};
