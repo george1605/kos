@@ -119,6 +119,17 @@ void pload()
 
 #endif
 
+struct task task_creat(int ring, long long stack)
+{
+  if(ring == 0)
+     return;
+  struct task c = newtask(IO_TASK);
+  c.perm = MEM_TASK;
+  if(ring < 2)
+    iopriv();
+  return c;
+}
+
 void psched()
 {
   int a, max = -100;
