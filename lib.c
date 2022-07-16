@@ -565,6 +565,14 @@ static void set_iopl(char x, char y)
   asm volatile ("mov %0, %%eflags","r"(i));
 }
 
+static void no_iopl()
+{
+  size_t i = readeflags();
+  i &= ~(1 << 12);
+  i &= ~(1 << 13);
+  asm volatile ("mov %0, %%eflags","r"(i));
+}
+
 void iopriv()
 {
   set_iopl(1,1);
