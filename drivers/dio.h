@@ -4,6 +4,7 @@ Direct IO - Avoiding the Syscalls
 #pragma once
 #include "../port.h"
 #include "../mem.h"
+#include "../time.c"
 #define DIO_VENDOR_ID  44
 #define DIO_MODULE_ID  120
 #define LBA28_LIMIT (1 << 28)
@@ -74,4 +75,20 @@ void disk_read(int drive, long long addr, void* memory)
         memory[idx * 2] = (unsigned char)tmpword;
         memory[idx * 2 + 1] = (unsigned char)(tmpword >> 8);
     }
+}
+       
+int disk_detect(int disk)
+{
+   int p = (disk == 1)? 0x1F6 : 0x176;
+   outb(p, 0xA0); 
+   sleep(1); 
+   tmpword = inb(0x1F7); 
+   return (tmpword & 0x40);
+}
+       
+void disk_read2(int drive, long long addr, void* memory)
+{
+    if(!disk_detect(drive))
+      return; // in future i will use the ram disk
+    disk_read(drive, addr, memory);
 }
