@@ -176,6 +176,26 @@ void *getptr(struct farptr u)
   return ptr;
 }
 
+struct heapblk heapnew(int bytes)
+{
+  struct heapblk *n = (struct heapblk *)0x7F0000;
+  n->ptr = alloc(0, bytes);
+  n->size = bytes;
+  n->flags = M_USED | M_BOTH;
+  cblk.next = n;
+  cblk = *n;
+  return n;
+}
+
+struct heapblk* heapmerge(struct heapblk *a, struct heapblk *b)
+{
+  struct heapblk* n = heapnew(a->size + b->size);
+  n->ptr = a->ptr;
+  a->flags |= M_VALID;
+  b->flags |= M_VALID;
+  free(a), free(b);
+}
+
 int heaptrv(int dir, struct heapblk *u)
 { // gets the number of heap blocks
   if (u == 0)
