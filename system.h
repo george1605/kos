@@ -174,6 +174,7 @@ void switch_userm()
 
 void switch_kernm()
 {
+  iopriv();
   usermode = 0;
   sysmode = 1;
 }
@@ -315,12 +316,14 @@ uint32_t __SYSCALL sys_memsz()
 
 void setcore(uint64_t base)
 {
+#ifdef _X86_
   asm volatile("wrmsr"
                :
                : "c"(0xc0000101), "d"((uint32_t)(base >> 32)), "a"((uint32_t)(base & 0xFFFFFFFF)));
   asm volatile("wrmsr"
                :
                : "c"(0xc0000102), "d"((uint32_t)(base >> 32)), "a"((uint32_t)(base & 0xFFFFFFFF)));
+#endif
 }
 
 struct proc __SYSCALL sys_execv(char *path, char *argv[])
