@@ -2,8 +2,8 @@
 Direct IO - Avoiding the Syscalls
 ***/
 #pragma once
+#include "ramdisk.h"
 #include "../port.h"
-#include "../mem.h"
 #include "../time.c"
 #define DIO_VENDOR_ID  44
 #define DIO_MODULE_ID  120

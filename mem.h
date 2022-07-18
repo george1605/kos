@@ -250,7 +250,10 @@ char readcbuf(struct circbuf *x, int off)
   return x->buffer[x->tail + off];
 }
 
-void __alloca(size_t size)
+void* __alloca(size_t size)
 {
-  asm volatile("mov $0, -%0(%%esp)":"r"(size)); // idk
+  char* c = getframe();
+  c -= size;
+  *c = 0;
+  return (void*)c;
 }
