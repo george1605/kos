@@ -26,3 +26,9 @@ void rammount(struct ramdisk* i, char* x)
   struct vfile n = vfsmap(x, i->ptr);
   i->fd = n.fd;
 }
+
+void ramunlink(struct ramdisk* i)
+{
+ i->fd = -1;
+ i->ptr = NULL_PTR; 
+}
