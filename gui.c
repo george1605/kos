@@ -236,6 +236,14 @@ typedef struct
   uint32_t bpp;
 } bitmap;
 
+void PopBitmap(bitmap* map, void* framebuffer)
+{
+  if(map == NULL_PTR || framebuffer == NULL_PTR)
+    return;
+  map->bpp = 4;
+  memmove(map->buf, framebuffer, map->width * map->height);
+}
+
 void DrawChar(char chr, struct font u)
 {
 }
