@@ -1,8 +1,5 @@
 #pragma once
-#include "../lib.c"
-#undef BASESP
-#undef ASMV
-
+#include "../noarch.h"
 #define MMIO32(x) (*(volatile unsigned int *)x)
 #define PPBI_BASE 0xE0000000U
 #define PERIPH_BASE 0x40000000U
@@ -14,6 +11,7 @@
 #define RTC_BASE PERIPH_BASE_APB1 + 0x2800
 #define FLASH_MEM_INTERFACE_BASE PERIPH_BASE_AHB1 + 0x2000
 #define POWER_CONTROL_BASE PERIPH_BASE_APB1 + 0x7000
+#define CTL_BASE MMIO32(PERIPH_BASE)
 
 #define MPU_TYPE MMIO32(MPU_BASE + 0x00)
 #define MPU_CTRL MMIO32(MPU_BASE + 0x04)
