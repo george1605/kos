@@ -123,3 +123,11 @@ long rtc_get()
 {
     return MMIO32(fmemmap.rtc);
 }
+
+// setups the firmware - the memory map
+void firm_setup()
+{
+    fmemmap.pin0 = 0x200000;
+    fmemmap.pin17 = fmemmap.pin0 + 4 * 17;
+    asm("mov r0, $0");
+}
