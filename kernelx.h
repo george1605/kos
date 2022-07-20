@@ -177,7 +177,7 @@ void unshrmem(char* phys)
   tlb_flush(0x1F000000);
 }
 
-void test_allocator()
+int test_allocator()
 {
   return (kmalloc(1, KERN_MEM) >= _vm(0));
 }
