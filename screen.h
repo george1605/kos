@@ -222,3 +222,27 @@ struct vscreen
    uint16_t s_width, s_height;
    void* s_mem;
 };
+
+// for monochrome
+void scrn_wbit(struct vscreen* scrn, size_t p)
+{
+    char* mem = (char*)scrn->s_mem;
+    mem[p / 8] |= (1 << (p % 8));
+}
+
+void scrn_ubit(struct vscreen* scrn, size_t p)
+{
+    char* mem = (char*)scrn->s_mem;
+    mem[p / 8] &= ~(1 << (p % 8));
+}
+
+char scrn_rbit(struct vscreen* scrn, size_t p)
+{
+     char* mem = (char*)scrn->s_mem;
+     return mem[p / 8] & (1 << (p % 8));
+}
+
+void scrn_free(struct vscreen* scrn)
+{
+    scrn->s_mem = NULL_PTR;   
+}
