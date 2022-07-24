@@ -37,6 +37,16 @@ struct binheap
   int flags;
 };
 
+struct malloc_block {
+    uint32_t size;  // Size of this memory block in bytes
+    char free;      // Is this block of memory free?
+    void* mem;
+    struct malloc_block *next;  // Next block of memory
+};
+
+static struct malloc_block *malloc_head = 0;    // Start of linked list
+static struct malloc_block *malloc_cnt = malloc_head;    // Start of linked list
+
 struct binheap binalloc(int size)
 {
   struct binheap u;
@@ -73,6 +83,21 @@ struct MemChunk *memalloc(size_t bytes)
   u->start = alloc(0, bytes);
   memcbrk += (1 + sizeof(struct MemChunk));
   return u;
+}
+
+void* safe_alloc(size_t size)
+{
+   if(malloc_head == 0)
+   {
+      malloc_head = memcbrk;
+      malloc_cnt = malloc_head;
+   }
+   malloc_cnt->next = malloc_cnt + sizeof(struct malloc_block) + 1;
+   malloc_cnt = malloc_cnt->next;
+   malloc_cnt->size = size;
+   malloc_cnt->free = 0;
+   malloc_cnt->mem  = kalloc(size, USER_MEM);
+   return malloc_cnt->mem;
 }
 
 void *dyalloc(size_t off)
@@ -176,7 +201,7 @@ void *getptr(struct farptr u)
   return ptr;
 }
 
-struct heapblk heapnew(int bytes)
+struct heapblk* heapnew(int bytes)
 {
   struct heapblk *n = (struct heapblk *)0x7F0000;
   n->ptr = alloc(0, bytes);

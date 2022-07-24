@@ -2,7 +2,7 @@
 #include "lib.c"
 #include "process.h"
 #include "port.h"
-#include "mem.h"
+#include "smem.h"
 #include "time.c"
 #include "fs.h"
 #include "vfs.h"
@@ -54,6 +54,7 @@ __SYSCALL int sys_int(void *arg1)
 {
   if (arg1 != 0)
     return *(int *)arg1;
+  return -1;
 }
 
 __SYSCALL void sys_sleep()
@@ -117,6 +118,19 @@ __SYSCALL void sys_rem(int fd)
   setfptr(fd, NULL_PTR); // just sets the filepointer to NULL
 }
 
+__SYSCALL void* sys_malloc(size_t size)
+{
+  return safe_alloc(size);
+}
+
+__SYSCALL void sys_free(void* ptr)
+{
+  struct malloc_block q;
+  for(q = malloc_head;q != 0;q = q->next)
+    if(q->mem == ptr)
+      q->free = 0;
+}
+
 void sysc_handler(struct regs *r)
 {
   switch (r->eax)
@@ -134,10 +148,10 @@ void sysc_handler(struct regs *r)
     sys_sleep();
     break;
   case 0x11:
-    r->err_code = inb(r->ebx);
+    r->ebx = sys_malloc(r->eax);
     break;
   case 0x12:
-    outb(r->ebx, r->err_code);
+    sys_free(r->ebx);
     break;
   case 0x13:
     sys_rem(r->eax);
