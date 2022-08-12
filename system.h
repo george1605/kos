@@ -148,7 +148,7 @@ void sysc_handler(struct regs *r)
     sys_sleep();
     break;
   case 0x11:
-    r->ebx = sys_malloc(r->eax);
+    r->ecx = sys_malloc(r->ebx);
     break;
   case 0x12:
     sys_free(r->ebx);
@@ -161,6 +161,17 @@ void sysc_handler(struct regs *r)
 void sysc_load() // add the sysc_handler()
 {
   idt_set_gate(0x80, (unsigned)sysc_handler, 0x08, 0x8F);
+}
+
+void userm_malloc(size_t size)
+{
+  void* p;
+  asm volatile("mov eax, 17;"
+               "mov ebx, %0;"
+               "int $0x80"
+               :"r"(size));
+  asm volatile("mov p, %%eax":"=r"(p));
+  return p;
 }
 
 void switch_userm()
