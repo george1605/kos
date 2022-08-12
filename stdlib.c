@@ -36,10 +36,10 @@ time_t time(int k){
   return cmos_read(SECS);
 }
 
-void* malloc(int bytes){
+void* malloc(size_t bytes){
   if(bytes > 0x100000)
     return _vm(0xFF00);
-  return alloc(0,bytes);
+  return userm_malloc(bytes);
 }
 
 char to_upper(char u){
