@@ -163,15 +163,24 @@ void sysc_load() // add the sysc_handler()
   idt_set_gate(0x80, (unsigned)sysc_handler, 0x08, 0x8F);
 }
 
-void userm_malloc(size_t size)
+void* userm_malloc(size_t size)
 {
   void* p;
-  asm volatile("mov eax, 17;"
-               "mov ebx, %0;"
+  asm volatile("mov %eax, $0x11;"
+               "mov %ebx, %0;"
                "int $0x80"
                :"r"(size));
-  asm volatile("mov p, %%eax":"=r"(p));
+  int ig;
+  asm volatile("mov $0, %%eax":"=r"(p):"r"(ig));
   return p;
+}
+
+void userm_free(void* ptr)
+{
+  asm volatile("mov %eax, $0x12;"
+               "mov %ebx, %0;"
+               "int $0x80"
+               :"r"(ptr));
 }
 
 void switch_userm()
