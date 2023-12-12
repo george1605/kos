@@ -4,6 +4,7 @@
 #include "kb.c"
 #include "lib.c"
 #include "floppy.h"
+#include "smem.h"
 #include "drivers/blockdev.h"
 
 #define PORTBASE 0x1C0000
@@ -265,11 +266,32 @@ void vfsclose(struct vfile vf)
   // TO DO!
 }
 
-struct buf* vfsread(struct vfile vf)
+struct buf* vfsread_k(struct vfile vf)
 {
   struct buf* x = TALLOC(struct buf);
   _read(vf.fd, x, 512);
   return x;
+}
+
+int vfseof(struct buf* buf)
+{
+  if(buf->flags == B_NONE)
+  {
+    _read(buf->dev, buf, 512);
+  }
+  return strcon(buf->data, '\0');
+}
+
+void vfsread(struct vfile vf, char* buffer, size_t size)
+{
+  struct buf* x = kmalloc(sizeof(struct buf));
+  int sz = 0;
+  while(sz < size)
+  {
+    _read(vf.fd, x, 512);
+    if(vfseof(x))
+      break;
+  }
 }
 
 struct vfile rfs_open(char *name)
@@ -285,4 +307,19 @@ void rfs_write(struct vfile u, const char *a, int size)
 {
   if (a != (char *)0 && size != 0)
     memcpy(u.fd, a, size);
+}
+
+void* vmap(void* location, size_t size, size_t flags, struct vfile* file)
+{
+  if(location == NULL_PTR)
+    location = kalloc(size, USER_MEM);
+  
+  void* virt = map_page(location, location + rand(), flags);
+  rseed++; // increases the seed
+  struct buf* buffer = (struct buf*)kalloc(sizeof(struct buf));
+  if(file != NULL_PTR)
+  {
+    // vfsread()
+  }
+  return virt;
 }

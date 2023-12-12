@@ -20,6 +20,8 @@ typedef uint64_t xtime_t; // extended UNIX Time
 typedef struct __File
 {
   char* _buf;
+  size_t _bufsize;
+  size_t _flags;
   int _fd;
   char* _perm;
   char _open;
@@ -101,9 +103,19 @@ void _fclose(FILE *x)
   }
 }
 
-void _fread(void* buf, int size, int cnt, FILE* PTR)
+void _fread(void* buf, int size, int cnt, FILE* ptr)
 {
-   
+  size_t bytes = size * cnt;
+  if(ptr->_buf != NULL && ptr->_flags != B_NONE)
+  {
+    memcpy(buf, ptr->_buf, min(bytes, ptr->_bufsize)); // copy data from buffer
+    ptr->_flags = B_NONE;
+    return 0;
+  }
+  struct vfile vf;
+  vf.fd = ptr->_fd;
+  vf.mem = NULL;
+  vfsread(vf, buf, bytes);
 }
 
 void _fclose(FILE* x)

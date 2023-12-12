@@ -243,6 +243,17 @@ void heapadd(struct heapblk *u, struct heapblk *i)
   u->prev = i;
 }
 
+void hmerge(struct heapblk* blk)
+{
+  if(blk->flags != blk->next->flags)
+    return;
+  
+  void* p = blk->next;
+  blk->size += blk->next->size;
+  blk->next = blk->next->next;
+  free(p); // what ?
+}
+
 struct heapblk *halloc(int bytes)
 {
   struct heapblk *start = cblk.next;

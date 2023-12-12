@@ -71,7 +71,6 @@ void wrfloppy(int base, char cmd)
 
 uint8_t rdfloppy(int base)
 {
-
   int i; 
   for (i = 0; i < 600; i++)
   {

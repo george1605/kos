@@ -62,11 +62,31 @@ struct vfile ttymap(char *name, size_t num)
   return u;
 }
 
-struct ttydev ttyopen(size_t num)
+struct ttydev ttyopen_k(size_t num)
 {
   if (ttys[num].flags == 0)
     ttyinit(num);
   return ttys[num];
+}
+
+static int tty_getid(char* name)
+{ 
+    
+    return 0;
+}
+
+struct ttydev ttyopen(char* name, int flags)
+{
+  struct ttydev dev;
+  if(flags == F_NEW)
+  {
+      dev.name = name;
+      return dev;
+  } else {
+      for(int i = 0;i < MAXTTY;i++)
+        if(strcmp(name, ttys[i].name))
+          return ttys[i];
+  }
 }
 
 void ttystart()

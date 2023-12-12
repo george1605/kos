@@ -5,6 +5,7 @@
 #define B_NONE 0x20
 #define BSIZE 512
 #define FSSIZE 20000
+
 struct buf {
   int flags;
   size_t dev;
@@ -15,6 +16,14 @@ struct buf {
   struct buf *qnext;
   size_t off;
   uint8_t data[BSIZE];
+};
+
+struct sbuf {
+  uint8_t* data;
+  size_t size;
+  size_t off; //
+  int flags;
+  size_t dev;
 };
 
 struct buflist {
