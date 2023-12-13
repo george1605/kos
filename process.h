@@ -153,6 +153,18 @@ struct proc myproc(void)
   return (*p);
 }
 
+// returns the process currently running
+struct proc* prswitch(struct proc* p)
+{
+  struct cpu* cpu = mycpu();
+  struct proc* lastp;
+  if(cpu->proc->flag != KILLED)
+    fxsave(cpu->proc->ctx); // save it now
+  lastp = cpu->proc;
+  cpu->proc = p;
+  return lastp;
+}
+
 void prcpy(struct proc a, struct proc b)
 { // copies the stack
   int n = 0;

@@ -28,6 +28,7 @@ typedef unsigned long long size_t;
 typedef uint16_t wchar_t;
 typedef unsigned long long uint64_t;
 typedef double f64;
+typedef char* va_list;
 size_t errno;
 
 void *getframe()
@@ -220,7 +221,7 @@ struct cpu
   struct context *scheduler;
 };
 
-struct cpu cpus[32];
+struct cpu cpus[32]; // max 32 cores - to be changed after no. cores goes brrr
 
 struct spinlock
 {
@@ -506,6 +507,41 @@ void pwarn(char *text)
     *BUFFER++ = *text++;
     *BUFFER++ = 0x2;
   }
+}
+
+#define va_start(arg, list) list = &arg
+#define va_arg(list, type) *(type*)(list); list += sizeof(type)
+#define va_end(list) list = NULL_PTR
+
+void snprintf(char* buf, size_t sz, const char* fmt, va_list args)
+{
+  char m;
+  while(*fmt)
+  {
+    m = *fmt; 
+    fmt++;
+    if(m == '%')
+    {
+      m = *(fmt++);
+      switch(m)
+      {
+
+      }
+    } else {
+      *buf++ = *fmt;
+    }
+  }
+}
+
+void printf(char* code, ...)
+{
+  va_list list;
+  char* buf[300];
+  va_start(code, list);
+  char* fmt = va_arg(list, char*);
+  snprintf(buf, sizeof buf, fmt, list);
+  kprint(buf);
+  va_end(list);
 }
 
 void kersc()
