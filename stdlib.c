@@ -4,6 +4,7 @@
 #include "fs.h"
 #include "time.c"
 
+#define F_ERROR 0xFF
 #define NULL NULL_PTR
 #define RAND_MAX ((1 << 31) - 1)
 #define RAND_MIN -RAND_MAX - 1
@@ -94,13 +95,51 @@ FILE *_fopen(char *name, char *mod)
   return x;
 }
 
+void _setbuf(FILE* fp, char* buf)
+{
+  if(fp->_buf != NULL) return;
+  fp->_buf = buf;
+}
+
+void _fwrite(void* data, size_t size, size_t count, FILE* fp)
+{
+  size_t sz = size * count;
+  if(fp->_buf != NULL_PTR)
+  {
+    memcpy(fp->_buf, data, min(sz, fp->_bufsize)); // buffering
+  }
+}
+
+int _ferror(FILE* fp)
+{
+  return fp->_flags & F_ERROR;
+}
+
+void _fprintf(FILE* fp, char* fmt, ...)
+{
+  va_list list;
+  char buf[300];
+  va_start(fmt, list);
+  char* fmt = va_arg(list, char*);
+  vsnprintf(buf, sizeof buf, fmt, list);
+  _fwrite(buf, sizeof buf, 1, fp);
+  va_end(list);
+}
+
+int _remove(char* name)
+{
+  int fd = sys_open(name, "r");
+  sys_rem(fd); // remove the file
+  sys_fclose((void*)fd);
+}
+
 void _fclose(FILE *x)
 {
-  if (x)
-  {
-    idewait(0);
-    free(x);
-  }
+  if (!x)
+    return;
+
+  sys_fclose((void*)x->_fd);
+  x->_open = (char)0;
 }
 
 void _fread(void* buf, int size, int cnt, FILE* ptr)
@@ -110,18 +149,12 @@ void _fread(void* buf, int size, int cnt, FILE* ptr)
   {
     memcpy(buf, ptr->_buf, min(bytes, ptr->_bufsize)); // copy data from buffer
     ptr->_flags = B_NONE;
-    return 0;
+    return;
   }
   struct vfile vf;
   vf.fd = ptr->_fd;
   vf.mem = NULL;
-  vfsread(vf, buf, bytes);
-}
-
-void _fclose(FILE* x)
-{
-  x->_open = 0;
-  free(x);
+  vfsread(vf, (char*)buf, bytes);
 }
 
 FILE *freopen(const char *filename, const char *mode, FILE *stream)
@@ -136,18 +169,6 @@ int fileno(FILE* f)
     return -1;
   
   return f->_fd;
-}
-
-void printf(const char* format, void* args)
-{
-  int i;
-  for(i = 0;format[i] != 0;i++)
-  {
-    if(format[i] != '%' && format[i+1] != 'i')
-      putch(format[i]);
-    else
-      puts(atoi(args[0]));
-  }
 }
 
 #define STACK(type)  struct stack_ ## type { \

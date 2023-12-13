@@ -104,7 +104,14 @@ __SYSCALL void sys_vfsread(void* arg1, void* arg2)
   struct vfile* vf = (struct vfile*)arg1;
   int* sz = (int*)arg2;
   char* data = (char*)(arg2 + sizeof(int));
-  vfsread(vf, data, *sz);
+  vfsread(*vf, data, *sz);
+}
+
+__SYSCALL void sys_fclose(void* arg1)
+{
+  struct vfile vf;
+  vf.fd = (int)arg1;
+  vfsclose(vf);
 }
 
 __SYSCALL void sys_write(void *arg1, void *arg2)
@@ -135,9 +142,9 @@ __SYSCALL void* sys_malloc(size_t size)
 
 __SYSCALL void sys_free(void* ptr)
 {
-  struct malloc_block q;
+  struct malloc_block* q;
   for(q = malloc_head;q != 0;q = q->next)
-    if(q->mem == ptr)
+    if(abs(ptr - q->mem) < q->size) // char* p = malloc(10); p++; free(p); <-- in this case it works
       q->free = 0;
 }
 

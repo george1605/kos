@@ -106,6 +106,14 @@ unsigned char kbdus[128] =
         0,
 };
 
+void getc_stdin()
+{
+  int code = inportb(0x60);
+  struct proc p = myproc();
+  char* s = (char*)p.std[0].mem;
+  s[0] = code;
+}
+
 char *kbdbuf = (char *)(0x2C00FF);
 uint16_t kbdindex = 0;
 void keyboard_handler(struct regs *r)
@@ -142,7 +150,7 @@ int getch()
 
 char *gets(size_t chars)
 {
-  char *i = alloc(0, chars);
+  char *i = (char*)kalloc(chars, KERN_MEM);
   int j;
   for (j = 0; j < chars; j++)
     i[j] = getch();
@@ -151,7 +159,7 @@ char *gets(size_t chars)
 
 char* getl()
 {
-  char* i = alloc(0, 64);
+  char* i = (char*)kalloc(64, KERN_MEM);
   int k = 0;
   while(k < 64)
   { 

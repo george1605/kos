@@ -81,6 +81,13 @@ int overflow(size_t *ptr)
   return 0;
 }
 
+size_t abs(long long l) // out of the box support for long numbers
+{
+  if(l < 0)
+    return -l;
+  return l;
+}
+
 void *idalloc(size_t id)
 {
   int *ptr = (int *)(id + 0x2C00000 + (id % 3)); // just to randomise a bit
@@ -509,11 +516,12 @@ void pwarn(char *text)
   }
 }
 
-#define va_start(arg, list) list = &arg
+// TO DO: Check actual definitions of these macros
+#define va_start(arg, list) list = (va_list)&arg
 #define va_arg(list, type) *(type*)(list); list += sizeof(type)
-#define va_end(list) list = NULL_PTR
+#define va_end(list) list = (va_list)NULL_PTR
 
-void snprintf(char* buf, size_t sz, const char* fmt, va_list args)
+void vsnprintf(char* buf, size_t sz, const char* fmt, va_list args)
 {
   char m;
   while(*fmt)
@@ -536,10 +544,10 @@ void snprintf(char* buf, size_t sz, const char* fmt, va_list args)
 void printf(char* code, ...)
 {
   va_list list;
-  char* buf[300];
+  char buf[300];
   va_start(code, list);
   char* fmt = va_arg(list, char*);
-  snprintf(buf, sizeof buf, fmt, list);
+  vsnprintf(buf, sizeof buf, fmt, list);
   kprint(buf);
   va_end(list);
 }

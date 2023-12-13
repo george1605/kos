@@ -2,6 +2,7 @@
 #include "ioapic.h"
 #include "smem.h"
 #include "cpuem.h"
+#include "vfs.h"
 #define __PROC_UNSAFE static
 
 #define X86ENV 1
@@ -35,6 +36,7 @@ struct proc
 {
   prstate state;
   struct proc *parent;
+  struct vfile std[3]; // stdin, stdout, stderr
   int pid;
   int ret;
   char *stack;

@@ -3,7 +3,6 @@
 #include "ata.h"
 #include "mem.h"
 #include "lib.c"
-#include "kb.c"
 #define F_NEW 1
 #define F_READ 2
 #define F_WRITE 4
@@ -100,7 +99,7 @@ struct ftable loadtbl(int ide)
 
 int savetbl(int ide, struct ftable* ft)
 {
-  if(ft == NULL) return -1;
+  if(ft == NULL_PTR) return -1;
   struct buf *b = TALLOC(struct buf);
   b->blockno = 2;
   b->flags = B_DIRTY;
@@ -166,8 +165,8 @@ char *getpath(char *bytes)
   return u;
 }
 
-#define VER_WRITE O_RDWR
-#define VER_READ O_RDONLY
+#define VER_WRITE F_RDWR
+#define VER_READ F_READ
 
 int access_ok(void* ptr, int perm, int size) // TODO here
 {
