@@ -39,6 +39,7 @@ struct proc
   int ret;
   char *stack;
   char *name;
+  void *ctx; // used for fxrestor(), fxsave()
   int ssize;
   func f;
 } tproc, kproc;
@@ -117,9 +118,9 @@ void prload(struct proc u, void* p) // loads the context from memory
 
 void pridle(struct proc u)
 {
+  u.state = PAUSED; // got it out the loop
   for(;;)
   {
-    u.state = PAUSED;
     asm volatile("pause");
   }
 }
@@ -265,17 +266,21 @@ void prsswap(struct proc prlist[], int procs)
   }
 }
 
-void prkill(struct proc u)
+int prkill(struct proc* u)
 {
-  if (u.pid > 1 && u.parent != 0)
+  if (u.pid < 1 || u.parent == 0)
   { // is a valid process
-    HALT();
-    prswap(*u.parent);
-    u.state = KILLED;
-    u.pid = 0;
-    free((int *)u.stack);
-    (&u)->stack = NULL_PTR;
+    return;
   }
+
+  // HALT(); - well, not anymore, getting better at this things
+  u->state = KILLED;
+  u->pid = 0;
+  free((int *)u.stack);
+  u->stack = NULL_PTR;
+  fxrestor(u->parent->ctx);
+  prswap(*(u->parent));
+  return u->ret;
 }
 
 void prclear(struct proc u)

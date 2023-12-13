@@ -97,6 +97,16 @@ __SYSCALL void sys_mkdir(void *arg1, void *arg2)
   mkdir(dname, parent);
 }
 
+__SYSCALL void sys_vfsread(void* arg1, void* arg2)
+{
+  if(arg1 == NULL_PTR || arg2 == NULL_PTR)
+    return;
+  struct vfile* vf = (struct vfile*)arg1;
+  int* sz = (int*)arg2;
+  char* data = (char*)(arg2 + sizeof(int));
+  vfsread(vf, data, *sz);
+}
+
 __SYSCALL void sys_write(void *arg1, void *arg2)
 {
   struct buf *a = (struct buf *)arg2;
