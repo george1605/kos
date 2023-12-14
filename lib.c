@@ -127,6 +127,50 @@ uint8_t sum(uint8_t *addr, int len)
   return sum;
 }
 
+size_t strlen(char *u)
+{
+  int i = 0;
+  if (u != 0)
+  {
+    while (*(u + i) != 0)
+      i++;
+  }
+  return i;
+}
+
+static inline void memset(void *dst, unsigned char value, size_t n)
+{
+  unsigned char *d = dst;
+
+  while (n-- > 0)
+  {
+    *d++ = value;
+  }
+}
+
+static inline void memsetw(void *dst, size_t value, size_t n)
+{
+  size_t *d = dst;
+
+  while (n-- > 0)
+  {
+    *d++ = value;
+  }
+}
+
+static inline void *memcpy(void *dst, const void *src, size_t n)
+{
+  unsigned char *d = dst;
+  const unsigned char *s = src;
+
+  while (n-- > 0)
+  {
+    *d++ = *s++;
+  }
+
+  return d;
+}
+
 char* strcat(char* a1, char* a2)
 {
   int y = strlen(a1), z = strlen(a2);
@@ -310,39 +354,6 @@ static inline void outportb(uint16_t port, uint8_t data)
   asm("outb %1, %0"
       :
       : "dN"(port), "a"(data));
-}
-
-static inline void memset(void *dst, unsigned char value, size_t n)
-{
-  unsigned char *d = dst;
-
-  while (n-- > 0)
-  {
-    *d++ = value;
-  }
-}
-
-static inline void memsetw(void *dst, size_t value, size_t n)
-{
-  size_t *d = dst;
-
-  while (n-- > 0)
-  {
-    *d++ = value;
-  }
-}
-
-static inline void *memcpy(void *dst, const void *src, size_t n)
-{
-  unsigned char *d = dst;
-  const unsigned char *s = src;
-
-  while (n-- > 0)
-  {
-    *d++ = *s++;
-  }
-
-  return d;
 }
 
 static inline char *itoa(size_t x, char *s, size_t sz)
@@ -720,17 +731,6 @@ void raise(int code)
 {
   errno = code;
   HALT();
-}
-
-size_t strlen(char *u)
-{
-  int i = 0;
-  if (u != 0)
-  {
-    while (*(u + i) != 0)
-      i++;
-  }
-  return i;
 }
 
 void geteflags(struct taskstate *t)

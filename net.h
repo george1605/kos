@@ -144,7 +144,7 @@ void netwritecmd(uint16_t p_address, size_t p_value)
 {
     if (bar_type == 0)
     {
-        write32(mem_base+p_address,p_value);
+        write32((void*)(mem_base + p_address), p_value);
     }
     else
     {
@@ -157,7 +157,7 @@ size_t netreadcmd(uint16_t p_address)
 {
     if (bar_type == 0)
     {
-        return read32(mem_base+p_address);
+        return read32((void*)(mem_base + p_address));
     }
     else
     {
@@ -181,4 +181,83 @@ int eeprom_detect()
                     eeprom_exists = 0;
     }
     return eeprom_exists;
+}
+
+
+typedef struct {
+    uint16_t io_base;
+    uint32_t mem_base;
+    uint8_t is_e;
+} e1000info;
+
+e1000info* global_e1000;
+#define E1000_DEV               0x100E
+#define E1000_REG_CTRL 		    0x0000
+#define E1000_REG_EEPROM 		0x0014
+#define E1000_REG_IMASK 		0x00D0
+
+void e1000write_l(e1000info *e, uint16_t addr, uint32_t val)
+{
+	outportl (e->io_base, addr);
+	outportl (e->io_base + 4, val);
+}
+
+void e1000write_b(e1000info *e, uint16_t addr, uint32_t val)
+{
+	outportl (e->io_base, addr);
+	outports (e->io_base + 4, val);
+}
+
+uint32_t e1000read_l(e1000info *e, uint16_t addr)
+{
+	outportl (e->io_base, addr);
+	return inportl (e->io_base + 4);
+}
+
+uint32_t e1000readprom(e1000info *e, uint8_t addr)
+{
+	uint32_t val = 0;
+	uint32_t test;
+	if(e->is_e == 0)
+		test = addr << 8;
+	else
+		test = addr << 2;
+
+	e1000write_l(e, E1000_REG_EEPROM, test | 0x1);
+	if(e->is_e == 0)
+		while(!((val = e1000read_l(e, E1000_REG_EEPROM)) & (1<<4)))
+		;//	printf("is %i val %x\n",e->is_e,val);
+	else
+		while(!((val = e1000read_l(e, E1000_REG_EEPROM)) & (1<<1)))
+		;//	printf("is %i val %x\n",e->is_e,val);
+	val >>= 16;
+	return val;
+}
+
+void e1000getmac(e1000info *e, char *mac)
+{
+	uint32_t temp;
+	temp = e1000readprom(e, 0);
+	mac[0] = temp &0xff;
+	mac[1] = temp >> 8;
+	temp = e1000readprom(e, 1);
+	mac[2] = temp &0xff;
+	mac[3] = temp >> 8;
+	temp = e1000readprom(e, 2);
+	mac[4] = temp &0xff;
+	mac[5] = temp >> 8;
+}
+
+void e1000enableint(e1000info *e)
+{
+	e1000write_l(e, E1000_REG_IMASK ,0x1F6DC);
+	e1000write_l(e, E1000_REG_IMASK ,0xff & ~4);
+	e1000read_l(e, 0xc0);
+}
+
+void e1000setup()
+{
+    uint32_t mac;
+    e1000getmac(global_e1000, (char*)&mac);
+    e1000enableint(global_e1000);
 }

@@ -1,7 +1,6 @@
 #pragma once
 #include "lib.c"
 #include "fpu.h"
-#include "reg.h"
 #include "idt.c"
 #include "gdt.c"
 #include "isr.c"
@@ -60,6 +59,26 @@ void envwrite(struct environ *v) // writes the environ variables
   ata_write_sector(&ata_primary_master, 20, v->vars);
 }
 
+void switch_long_mode() {
+    uint64_t cr4;
+    asm volatile("mov %%cr4, %0" : "=r"(cr4));
+    cr4 |= (1 << 5);  // Set the 5th bit for Long Mode
+    asm volatile("mov %0, %%cr4" :: "r"(cr4));
+
+    uint64_t efer;
+    asm volatile("rdmsr" : "=A"(efer) : "c"(0xC0000080));
+    efer |= (1 << 8);
+    asm volatile("wrmsr" :: "c"(0xC0000080), "A"(efer));
+
+    asm volatile(
+        "mov $1f, %0 \n\t"  
+        "ljmp $0x8, %0 \n\t" 
+        "1:"
+        :
+        : "m"(0x1000)
+    );
+}
+
 void init()
 {
   idt_init();
@@ -73,6 +92,8 @@ void init()
   kbd_init();
   mouse_init();
   timer_init();
+  switch_long_mode();
+  kprint("x64 Mode Activated. (Respect +)");
   fs_init();
   vfsinit();
   ttyinit(0);

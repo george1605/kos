@@ -49,7 +49,7 @@ struct proc
 struct prset
 {
   struct proc* procs;
-  int cnt;
+  size_t cnt, front, rear, size;
   struct spinlock lock;
 } prlist;
 
@@ -60,6 +60,33 @@ void prappend(struct proc u)
   acquire(&prlist.lock);
   prlist.procs[++prlist.cnt] = u;
   release(&prlist.lock);
+}
+
+void sched()
+{
+  struct proc p = prlist.procs[prlist.front];
+  prlist.front = (prlist.front + 1) % prlist.cnt;
+  prlist.size--;
+  prswap(p);
+  delay(5000); // <-- this corresponds to the time frame for each process
+  prswap(tproc);
+  if(p.state != KILLED)
+  {
+    prlist.rear = (prlist.rear + 1) % prlist.cnt;
+    prlist.procs[prlist.rear] = p;
+    prlist.size++;
+  }
+}
+
+struct proc prnew_k(char* name, int memSize)
+{
+  struct proc p;
+  p.name = name;
+  p.stack = (char*)vmap(NULL_PTR, memSize, 0, (vfile*)NULL_PTR);
+  p.ssize = memSize;
+  p.parent = &tproc;
+  sched();
+  return p;
 }
 
 struct sleeplock
@@ -160,7 +187,7 @@ struct proc* prswitch(struct proc* p)
 {
   struct cpu* cpu = mycpu();
   struct proc* lastp;
-  if(cpu->proc->flag != KILLED)
+  if(cpu->proc->state != KILLED)
     fxsave(cpu->proc->ctx); // save it now
   lastp = cpu->proc;
   cpu->proc = p;
@@ -282,37 +309,29 @@ void prsswap(struct proc prlist[], int procs)
 
 int prkill(struct proc* u)
 {
-  if (u.pid < 1 || u.parent == 0)
-  { // is a valid process
+  if (u->pid < 1 || u->parent == 0)
     return;
-  }
 
   // HALT(); - well, not anymore, getting better at this things
   u->state = KILLED;
   u->pid = 0;
-  free((int *)u.stack);
-  u->stack = NULL_PTR;
+  free((int *)u->stack);
+  u->stack = (char*)NULL_PTR;
   fxrestor(u->parent->ctx);
   prswap(*(u->parent));
+  sched(); // reschedule 
   return u->ret;
-}
-
-void prclear(struct proc u)
-{
-  int i = 0;
-  while (prlist.procs[i].stack != NULL_PTR)
-    prkill(prlist.procs[i]), i++;
 }
 
 void prend(struct proc u, int status)
 {
-  prkill(u);
+  prkill(&u);
   kprint("Process ended with status: ");
 }
 
 void exitk()
 { // enters the kernel
-  prkill(tproc);
+  prkill(&tproc);
   prswap(kproc);
 }
 
