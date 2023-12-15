@@ -47,6 +47,11 @@ static void ideinit(){
   outb(0x1f6, 0xe0 | (0<<4));
 }
 
+struct diskseg {
+  size_t size;
+  size_t start;
+  uint8_t diskno;
+};
 
 static void idestart(struct buf *b)
 {
@@ -130,6 +135,25 @@ struct buf* breads(int dev,int blockno){
   return b;
 }
 
+// This struct buf from mit-pdos/xv6 is driving me crazy.
+// Maybe should have chosen a better system
+// It would be more efficient if I didn't do memcpy's, just increment the buf pointer to data
+void idereadseg(char* buffer, struct diskseg seg)
+{
+  struct buf* b = kalloc(sizeof(struct buf), KERN_MEM);
+  b->dev = seg.diskno;
+  b->blockno = seg.start / 512;
+  int stopseg = (seg.start + seg.size) / 512;
+  while(b->blockno < stopseg)
+  {
+    bread(b, b->dev);
+    memcpy(buffer, b->data, 512);
+    buffer += 512;
+    b->blockno++;
+  }
+  free(b);
+}
+
 void brelse(struct buf* b){
    free(b);
 }
@@ -207,7 +231,6 @@ struct disksct sctalloc(int dev, long long start){
   struct disksct u;
   u.start = start;
   u.end = start + 1024;
-
 }
 
 void sctfree(struct disksct u){

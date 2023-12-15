@@ -84,9 +84,19 @@ struct proc prnew_k(char* name, int memSize)
   p.name = name;
   p.stack = (char*)vmap(NULL_PTR, memSize, 0, (vfile*)NULL_PTR);
   p.ssize = memSize;
+  p.pid = ++lpid;
   p.parent = &tproc;
   sched();
   return p;
+}
+
+// create a process with the same name, link with the parent proc + copy the mem
+struct proc prfork()
+{
+  struct proc parent = myproc();
+  struct proc p = prnew_k(parent.name, parent.ssize);
+  p.parent = &parent;
+  memcpy(p.stack, parent.stack, parent.ssize);
 }
 
 struct sleeplock

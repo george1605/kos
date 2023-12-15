@@ -19,6 +19,18 @@ uint8_t PagePort[8]  = { 0x87, 0x83, 0x81, 0x82, 0x8F, 0x8B, 0x89, 0x8A };
 uint8_t AddrPort[8]  = { 0x00, 0x02, 0x04, 0x06, 0xC0, 0xC4, 0xC8, 0xCC };
 uint8_t CountPort[8] = { 0x01, 0x03, 0x05, 0x07, 0xC2, 0xC6, 0xCA, 0xCE };
 
+void dmafrom(dmablock* blk, char* ptr)
+{
+    unsigned int temp, segment, offset;
+    unsigned long foo;
+    segment = (size_t)ptr / 4096;
+    offset  = (size_t)ptr % 4096;
+    blk->page = (segment & 0xF000) >> 12;
+    temp = (segment & 0x0FFF);
+    blk->page++;
+    blk->offset = (unsigned int)foo;
+}
+
 void dmastart(uint8_t channel, dmablock* blk, uint8_t mode)
 {
     mode |= channel;

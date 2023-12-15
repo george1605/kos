@@ -84,6 +84,17 @@ struct ElfToken
   const char *name;
 };
 
+struct ElfHeader* pr_allocelf(struct proc* p)
+{
+  struct ElfHeader* head = (struct ElfHeader*)vmap(p->stack, sizeof(struct ElfHeader), 0, NULL_PTR);
+  return head;
+}
+
+void reallocelf(struct ElfHeader* header)
+{
+  header->e_entry = vmap(header->e_entry, sizeof(void*), 0, NULL_PTR);
+}
+
 void readsym(struct ElfSymbol u, char bytes[])
 {
 }
