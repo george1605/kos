@@ -23,8 +23,48 @@ struct vfile
   char *name;
   void *mem;
   size_t size; // memory size
+  int refcnt; // for link and unlink
   int status;
 } vroot;
+
+// parses the path
+void vfsparse(struct vfile* head, char* path)
+{
+  int i = 0;
+  for(;path[i] != '\0';i++)
+  {
+    if()
+  }
+}
+
+void vfslink(struct vfile* vf, char* path)
+{
+  vf->refcnt++;
+  struct vfile* newf = kalloc(sizeof(struct vfile), KERN_MEM);
+  memcpy(newf, vf, sizeof(struct vfile));
+  newf->name = strdup(path);
+  newf->parent = vf; // if they have the same fd then they ar elinked, then not
+  return newf;
+}
+
+int fdalloc()
+{
+  // TO DO: create a fd allocator
+  return 0xFF;
+}
+
+void vfsunlink(struct vfile* chvf)
+{
+  struct vfile* p = chvf->parent;
+  if(p->fd != chvf->fd) // they are not linked, are different files
+    return;
+  if(--p->refcnt <= 0)
+  {
+    // TO DO: delete the file
+  }
+  chvf->parent = NULL_PTR;
+  chvf->fd = fdalloc(); // get a different fd
+}
 
 struct kmap getmap(struct vfile u)
 {

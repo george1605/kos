@@ -1,9 +1,11 @@
 #pragma once
 #include "lib.c"
-#include "mem.h"
+#include "smem.h"
 #include "fs.h"
+#include "dma.h"
+#define IOMEM_DMA 1
 
-int* drivbrk = DRIV_MEM + 10;
+int* drivbrk = (int*)(DRIV_MEM + 10);
 
 void dbgprint(char* u){
   kprint(u);
@@ -11,6 +13,26 @@ void dbgprint(char* u){
 
 void dbgerr(char* u){
   perror(u);
+}
+
+struct iomem 
+{
+  size_t channel; // for DMA
+  size_t size; // also for DMA
+};
+
+// similar to iorequest()
+void* iommap(void* mem, struct iomem info, int type)
+{
+  dmablock blk;
+  if(type == IOMEM_DMA)
+  {
+    dmafrom(&blk, (char*)mem);
+    blk.length = info.size;
+    dmastart(info.channel, &blk, 0);
+    return vmap(mem, info.size, 0, (struct vfile*)NULL_PTR); // maps to virtual memory
+  }
+  return NULL_PTR;
 }
 
 struct drivobj {

@@ -19,6 +19,15 @@ struct mp
   uint8_t reserved[3];
 };
 
+struct mpioapic 
+{
+  uint8_t type; 
+  uint8_t id;
+  uint8_t version;
+  uint8_t flags; 
+  uint32_t address;
+};
+
 struct mp* mpsearchx(size_t a, int len)
 {
   uint8_t *e, *p, *addr;
@@ -55,5 +64,3 @@ void mpinit(){
   outb(0x22, 0x70);   // Select IMCR
   outb(0x23, inb(0x23) | 1);
 }
-
- 

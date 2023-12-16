@@ -87,6 +87,7 @@ void init()
   sysc_load();
   irq_init();
   fpu_init();
+  sse_init();
   proc_init();
   pci_init();
   kbd_init();

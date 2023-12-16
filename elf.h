@@ -1,4 +1,5 @@
 #pragma once
+#include "port.h"
 #include "lib.c"
 #include "smem.h"
 #include "pipe.c"
@@ -51,6 +52,25 @@ struct ProgramHeader
   long p_filesz;
   long p_memsz;
 };
+
+typedef void(*entry_t)(void);
+
+// loads the header and returns the entry point
+// got from xv6, same source of struct buf madness
+entry_t elfloadall(struct ElfHeader* hdr)
+{
+  struct ProgramHeader* ph = (struct ProgramHeader*)((uint8_t*)hdr + hdr->e_phoff), *endph;
+  endph = ph + ph->p;
+  void* pa;
+  for(;ph < eph;ph++)
+  {
+    pa = ph->p_addr;
+    readseg(pa, ph->filesz, ph->off);
+    if(ph->memsz > ph->filesz)
+      stosb(pa + ph->filesz, 0, ph->memsz - ph->filesz);
+  }
+  return (entry_t)(hdr->e_entry);
+}
 
 struct ElfSection
 {

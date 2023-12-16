@@ -295,6 +295,16 @@ struct proc procid(int pid) // if it doesn't find a process, it creates one
   return t;
 }
 
+// call the function and change the stat of the process
+void prcall(int pid, int argc, char** argv)
+{
+  struct proc p = procid(pid);
+  if(p.state != EMBRYO) return;
+  argv[0] = strdup(p.name); // puts the name into it even if argv[0] = NULL_PTR
+  p.f(argc, argv);
+  p.state = STARTED;
+}
+
 void waitpid(int pid)
 {
   struct proc u = procid(pid);
