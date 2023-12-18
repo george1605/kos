@@ -82,3 +82,21 @@ void fxrestor(void* ptr)
   if (ptr == NULL_PTR) ptr = (void *)0x1001000;
   asm volatile("fxrstor64 (%0)" ::"r"((int*)ptr) : "memory");
 }
+
+void cpugetinfo(size_t* no_cores, size_t* no_threads)
+{
+  unsigned int eax, ebx, ecx, edx;
+  cpuid(1, eax, ebx, ecx, edx);
+  *no_cores = (ebx >> 16) & 0xFF;
+  *no_threads = ecx & 0xFFFF;
+}
+
+void kprintinfo()
+{
+  size_t cores, threads;
+  cpugetinfo(&cores, &threads);
+  kprint("Number of cores: ");
+  kprintint(cores);
+  kprint(", number of threads:");
+  kprintint(threads);
+}

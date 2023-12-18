@@ -194,10 +194,6 @@ void screen_new(){
 #define VIDEO_TYPE_COLOUR 0x20
 #define VIDEO_TYPE_MONOCHROME 0x30
 
-void fbmount(){
-  sysvf[15] = vfsmap("/home/dev/vid0.dev",(void*)getfb()); // creates a virtual control file 
-}
-
 void fbclear(size_t color){
    int i;
    size_t* ptr = (size_t*)VBUFFER_EX;
@@ -209,6 +205,50 @@ void fbclear(size_t color){
 uint16_t vidgetinfo(void){
   const uint16_t* bda_detected_hardware_ptr = (uint16_t*)0x410;
   return (*bda_detected_hardware_ptr);
+}
+
+#define VID_VGA 0x1
+#define VID_VESA 0x2
+#define VID_INTLGPU 0x3
+#define VID_NVDIA 0x4 // <-- "we" don't like this :)
+#define VID_REQ 0x0
+
+// returns the vfile from list if already setup, else sets it up
+// according to the flags
+struct vfile* vidvirt(int flags)
+{
+   struct vfile vf;
+
+   if(sysvf[6].mem != NULL_PTR || flags == 0)
+      return &sysvf[6];
+
+   switch(flags)
+   {
+      case VID_VGA:
+         vf.mem = (void*)0xA0000;
+         vf.size = 64 * 1024; // 64 KB of VGA memory
+      break;
+      case VID_VESA:
+         vf.mem = (void*)getfb();
+         vf.size = 1920 * 1080 * 4;
+      break;
+      default:
+         vf.mem = (void*)0xB8000; // returns the default text mode
+         vf.size = 80 * 25 * 2; 
+   }
+   sysvf[6] = vf;
+   return &sysvf[6];
+}
+
+// requests the video buffer by the process
+// maps to the virtual space
+// links it with the stdout (std[1])
+void vidreq()
+{
+   struct proc p = myproc();
+   struct vfile* vf = vidvirt(0);
+   vf->mem = vmap(vf->mem, vf->size, 0, NULL_PTR);
+   vfslink2(vf, &(p.std[1]));
 }
  
 int viddetect(void){

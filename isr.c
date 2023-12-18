@@ -35,6 +35,8 @@ extern void isr29();
 extern void isr30();
 extern void isr31();
 
+extern void sysc_handler(struct regs* r);
+
 void isrs_install()
 {
     idt_set_gate(0, (unsigned)isr0, 0x08, 0x8E);
@@ -120,6 +122,11 @@ void fault_handler(struct regs *r)
     {
         perror(exception_messages[r->int_no]);
         asm("pause");
+    } else if(r->int_no == 0x80) {
+        sysc_handler(r);
+    } else {
+        kprint("Unknown interrupt: ");
+        kprintint(r->int_no);
     }
 }
 

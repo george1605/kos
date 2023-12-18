@@ -499,6 +499,13 @@ void putch(unsigned char c)
   move_csr();
 }
 
+void kprintint(int n)
+{
+  char buf[30];
+  itoa(n, buf, sizeof(buf));
+  kprint(buf);
+}
+
 void kprint(char *text)
 {
   while (*text)
@@ -612,12 +619,23 @@ static inline size_t readeflags()
   return eflags;
 }
 
+static inline void pusheflags(size_t flags)
+{
+  asm volatile (
+        "push  %[flags]\n"   // Push the new EFLAGS value onto the stack
+        "popf\n"                 // Pop the new value into EFLAGS
+        :
+        : [flags] "rm" (flags)
+        : "flags"  // clobbered register: informs the compiler that EFLAGS is modified
+  );
+}
+
 static void set_iopl(char x, char y)
 {
   size_t i = readeflags();
   i |= (x << 12);
   i |= (y << 13);
-  asm volatile ("mov %0, %%eflags","r"(i));
+  pusheflags(i);
 }
 
 static void no_iopl()
@@ -625,7 +643,7 @@ static void no_iopl()
   size_t i = readeflags();
   i &= ~(1 << 12);
   i &= ~(1 << 13);
-  asm volatile ("mov %0, %%eflags","r"(i));
+  pusheflags(i);
 }
 
 void iopriv()

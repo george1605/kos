@@ -27,24 +27,36 @@ struct vfile
   int status;
 } vroot;
 
-// parses the path
+// parses the path and creates the "tree"
 void vfsparse(struct vfile* head, char* path)
 {
   int i = 0;
+  struct vfile* vf = head;
   for(;path[i] != '\0';i++)
   {
-    if()
+    if(path[i] == '/') // unix path
+    {
+      
+    }
   }
 }
 
-void vfslink(struct vfile* vf, char* path)
+struct vfile* vfslink(struct vfile* vf, char* path)
 {
   vf->refcnt++;
   struct vfile* newf = kalloc(sizeof(struct vfile), KERN_MEM);
   memcpy(newf, vf, sizeof(struct vfile));
   newf->name = strdup(path);
-  newf->parent = vf; // if they have the same fd then they ar elinked, then not
+  newf->parent = vf; // if they have the same fd then they are linked, then not
   return newf;
+}
+
+void vfslink2(struct vfile* vfpar, struct vfile* vfchld)
+{
+  if(vfpar == NULL_PTR || vfchld == NULL_PTR) return;
+  memcpy(vfchld, vfpar, sizeof(struct vfile)); // copies everything, even fd
+  vfchld->parent = vfpar;
+  vfpar->refcnt++;
 }
 
 int fdalloc()
@@ -324,7 +336,7 @@ int vfseof(struct buf* buf)
 
 void vfsread(struct vfile vf, char* buffer, size_t size)
 {
-  struct buf* x = kmalloc(sizeof(struct buf));
+  struct buf* x = kalloc(sizeof(struct buf));
   int sz = 0;
   while(sz < size)
   {
@@ -356,10 +368,22 @@ void* vmap(void* location, size_t size, size_t flags, struct vfile* file)
   
   void* virt = map_page(location, location + rand(), flags);
   rseed++; // increases the seed
-  struct buf* buffer = (struct buf*)kalloc(sizeof(struct buf));
   if(file != NULL_PTR)
   {
-    // vfsread()
+    vfsread(*file, (char*)virt, size);
   }
   return virt;
+}
+
+void* vmapx(void* phys, void* virt, size_t size, size_t flags, struct vfile* file)
+{
+  if(virt == NULL_PTR)
+    return vmap(phys, size, flags, file);
+  
+  void* addr = map_page(phys, virt, flags);
+  if(file != NULL_PTR)
+  {
+    vfsread(*file, (char*)virt, size);
+  }
+  return addr;
 }

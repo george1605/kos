@@ -37,29 +37,13 @@ void *smalloc(int bytes)
   return u;
 }
 
-void *incp(int *u)
-{
-  if (*(u + 1) == 0xdeadbeef)
-    return (void *)0;
-  else
-    return (++u);
-}
-
-void *decp(int *u)
-{
-  if ((int)u == 1 || *(u - 1) == 0xdeadbeef) /* checks for metadata or NULL */
-    return (void *)0;
-  else
-    return (--u);
-}
-
 void *alloc(void *start, int bytes)
 {
   int *u = heapbrk;
   if (start == 0)
     heapbrk += (bytes + 2);
   else if (start > heapbrk)
-    heapbrk = start + bytes + 2;
+    heapbrk = (int*)start + bytes + 2;
   else
     heapbrk += (bytes + 2);
 
@@ -200,25 +184,9 @@ struct circbuf
   size_t tail;
 };
 
-struct bit
-{
-  char value : 1;
-};
-
-long bitval(struct bit bitarr[], int size)
-{
-  int a, p = 1;
-  long val;
-  for (a = 0; a < size; a++)
-  {
-    val += p * bitarr[a].value;
-    p *= 2;
-  }
-}
-
 void initcbuf(struct circbuf *x, size_t size)
 {
-  x->buffer = kalloc(size, KERN_MEM);
+  x->buffer = (char*)kalloc(size, KERN_MEM);
   x->length = size;
   x->point = 0;
   x->tail = 0;
@@ -252,7 +220,7 @@ char readcbuf(struct circbuf *x, int off)
 
 void* __alloca(size_t size)
 {
-  char* c = getframe();
+  char* c = (char*)getframe();
   c -= size;
   *c = 0;
   return (void*)c;

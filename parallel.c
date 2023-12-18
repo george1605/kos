@@ -3,6 +3,7 @@
 #include "lib.c"
 #include "time.c"
 #include "vfs.h"
+#include "process.h"
 #define LPT1 0x3BC
 #define LPT2 0x378
 #define LPT3 0x278
@@ -59,14 +60,23 @@ void parwrite(struct pardev i, char *u)
     }
 }
 
-struct vfile parmap(char *fname, struct pardev i)
+struct vfile* parmap(char *fname, struct pardev i)
 {
-    struct vfile u;
-    u.fd = 0x1C0000 + i.type;
-    u.status = 0x8;
-    u.mem = NULL_PTR;
-    u.name = fname;
+    struct vfile* u = kalloc(sizeof(struct vfile), KERN_MEM);
+    u->fd = 0x1C0000 + i.type;
+    u->status = 0x8;
+    u->mem = NULL_PTR;
+    u->name = strdup(fname);
     return u;
+}
+
+// link both the stdin and stdout to the parallel port
+void parlink(struct pardev p)
+{
+    struct proc pr = myproc();
+    struct vfile* file = parmap(NULL_PTR, p);
+    vfslink2(file, &(pr.std[1]));
+    vfslink2(file, &(pr.std[0]));
 }
 
 char *parread(struct pardev u, size_t size)

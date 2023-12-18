@@ -106,6 +106,87 @@ typedef struct
     size_t size;
   } xhcilist;
 
+  struct xhci_cap_regs {
+	volatile uint32_t cap_caplen_version;
+	volatile uint32_t cap_hcsparams1;
+	volatile uint32_t cap_hcsparams2;
+	volatile uint32_t cap_hcsparams3;
+	volatile uint32_t cap_hccparams1;
+	volatile uint32_t cap_dboff;
+	volatile uint32_t cap_rtsoff;
+	volatile uint32_t cap_hccparams2;
+} __attribute__((packed));
+
+struct xhci_port_regs {
+	volatile uint32_t port_status;
+	volatile uint32_t port_pm_status;
+	volatile uint32_t port_link_info;
+	volatile uint32_t port_lpm_control;
+} __attribute__((packed));
+
+struct xhci_op_regs {
+	volatile uint32_t op_usbcmd;   /* 0 */
+	volatile uint32_t op_usbsts;   // 4
+	volatile uint32_t op_pagesize; // 8h
+	volatile uint32_t op__pad1[2]; // ch 10h
+	volatile uint32_t op_dnctrl;   // 14h
+	volatile uint32_t op_crcr[2];     // 18h 1ch
+	volatile uint32_t op__pad2[4]; // 20h 24h 28h 2ch
+	volatile uint32_t op_dcbaap[2];   // 30h 34h
+	volatile uint32_t op_config;   // 38h
+	volatile uint8_t  op_more_padding[964]; // 3ch-400h
+	struct xhci_port_regs op_portregs[256];
+} __attribute__((packed));
+
+struct xhci_trb {
+	uint32_t trb_thing_a;
+	uint32_t trb_thing_b;
+	uint32_t trb_status;
+	uint32_t trb_control;
+} __attribute__((packed));
+
+struct xhcictrlinfo {
+	void* mmio;
+	uint32_t device;
+	uint64_t pcie_offset;
+	struct xhci_cap_regs * cregs;
+	struct xhci_op_regs * oregs;
+	struct proc * thread;
+	volatile struct xhci_trb * cr_trbs;
+	volatile struct xhci_trb * er_trbs;
+	spinlock command_queue;
+	uint32_t command_queue_cycle;
+	int command_queue_enq;
+	volatile uint32_t * doorbells;
+};
+
+static int xhci_command(struct xhcictrlinfo * controller, uint32_t p1, uint32_t p2, uint32_t status, uint32_t control) 
+{
+	acquire(&(controller->command_queue));
+	control &= ~1;
+	control |= controller->command_queue_cycle;
+
+	controller->cr_trbs[controller->command_queue_enq].trb_thing_a = p1;
+	controller->cr_trbs[controller->command_queue_enq].trb_thing_b = p2;
+	controller->cr_trbs[controller->command_queue_enq].trb_status  = status;
+	controller->cr_trbs[controller->command_queue_enq].trb_control = control;
+
+	controller->command_queue_enq++;
+	if (controller->command_queue_enq == 63) {
+		controller->cr_trbs[controller->command_queue_enq].trb_control ^= 1;
+		if (controller->cr_trbs[controller->command_queue_enq].trb_control & (1 << 1)) {
+			controller->command_queue_cycle ^= 1;
+		}
+		controller->command_queue_enq = 0;
+	}
+
+	/* ring doorbell */
+	controller->doorbells[0] = 0;
+
+	release(&(controller->command_queue));
+	return 0;
+}
+
   int xhcinew()
   {
     enable_mastering(0, 0, 0);

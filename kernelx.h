@@ -160,7 +160,7 @@ void __ata_async(int argc, char** argv) // asynchronous IO
 
 void ata_asread(int ata, int sect)
 {
-  struct thread x = thcreat(tproc, 512);
+  struct thread x = thcreat(&tproc, 512);
   x.f = __ata_async;
   thrunp(x, cthread);
 }
@@ -179,5 +179,5 @@ void unshrmem(char* phys)
 
 int test_allocator()
 {
-  return (kmalloc(1, KERN_MEM) >= _vm(0));
+  return (kalloc(1, KERN_MEM) >= _vm(0));
 }

@@ -2,7 +2,29 @@
 #include "../mem.h"
 #include "../fs.h"
 #include "../user.h"
+#include "../elf.h"
 int _seplen = 0;
+
+struct shell
+{
+  int argc;
+  char** argv;
+  struct console cons;
+};
+
+// in the binary dir (will make one that looks through PATH env later)
+char* find_ex(char* arg0)
+{
+  char* buf = kalloc(300, KERN_MEM);
+  memcpy(buf, "/dev/bin/", 9);
+  memcpy(buf + 9, arg0, strlen(arg0));
+  return buf;
+}
+
+void exec_shell(struct shell sh)
+{
+  char* path = find_ex(sh.argv[0]);
+}
 
 char* strsep(char* s, char* delm)
 {

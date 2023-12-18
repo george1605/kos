@@ -2,6 +2,7 @@
 #include "lib.c"
 #include "mem.h"
 #include "port.h"
+#include "vfs.h"
 #define AMDGPU 0x1022
 #define INTELD 0x8086
 
@@ -234,6 +235,7 @@ void pci_setup(struct pcidev *_Devs, int _DevNo)
 						if (pci_checks(i, j, k))
 						{
 							pci_add(i, j, k);
+							kprint("Found PCI device\n");
 						}
 					}
 				}
@@ -300,4 +302,13 @@ inline size_t pci_baseaddr(uint8_t idx, struct pcidev dev)
 	}
 
 	return (bar & 0x1) ? (bar & 0xFFFFFFFFFFFFFFFC) : (bar & 0xFFFFFFFFFFFFFFF0);
+}
+
+struct vfile* pci_vfsmap(struct pcidev dev)
+{
+	struct vfile* vf = kalloc(sizeof(struct vfile), KERN_MEM);
+	vf->drno = dev.device;
+	vf->mem = pci_baseaddr(0, dev);
+	vf->refcnt = 1;
+	return vf;
 }

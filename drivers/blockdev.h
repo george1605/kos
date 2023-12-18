@@ -58,6 +58,31 @@ struct rqueue
   unsigned long time;
 };
 
+struct dblock 
+{
+  uint8_t* data;
+  size_t size;
+};
+
+struct blkopts
+{
+  struct blkdev device;
+  void(*read)(struct blkopts*, struct dblock*);
+  void(*write)(struct blkopts*, struct dblock*);
+};
+
+void blkgets(struct blkopts* opts, uint8_t* buf, size_t size)
+{
+  struct dblock block;
+  block.data = buf;
+  int sz = 0;
+  while(sz < size) {
+    opts->read(opts, &block);
+    sz += block.size;
+    block.data += block.size;
+  }
+}
+
 struct devdrv
 { // device driver
   int type, num;
@@ -214,7 +239,7 @@ char blkgetc(struct blknode _Node)
   if(_Node.dev->portno == -1) // is a null dev 
     return (char)-1;
   
-  return inb(_Node.dev->port);
+  return inb(_Node.dev->portno);
 }
 
 char *blkreads(struct blkdev *_Block)

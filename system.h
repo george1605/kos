@@ -148,36 +148,37 @@ __SYSCALL void sys_free(void* ptr)
       q->free = 0;
 }
 
-void sysc_handler(struct regs *r)
+#define MAX_SYSCALLS 20
+void* syscalls[MAX_SYSCALLS];
+
+void sysc_add(int id, void* func)
 {
-  switch (r->eax)
+  if(id > MAX_SYSCALLS)
   {
-  case 0x4:
-    sys_open((void *)r->ebx, (void *)r->ecx);
-    break;
-  case 0x5:
-    sys_write((void *)r->ebx, (void *)r->ecx);
-    break;
-  case 0xF:
-    r->ebx = (size_t)sys_time();
-    break;
-  case 0x10:
-    sys_sleep();
-    break;
-  case 0x11:
-    r->ecx = sys_malloc(r->ebx);
-    break;
-  case 0x12:
-    sys_free(r->ebx);
-    break;
-  case 0x13:
-    sys_rem(r->eax);
+    kprint("Cannot add syscall (id > MAX_SYSCALLS)");
   }
+  syscalls[id] = func;
 }
 
-void sysc_load() // add the sysc_handler()
+void sysc_handler(struct regs *r)
 {
-  idt_set_gate(0x80, (unsigned)sysc_handler, 0x08, 0x8F);
+  void* handler = syscalls[r->eax];
+  int ret;
+  asm volatile("push %1 \n"
+               "push %2 \n"
+               "push %3 \n"
+               "push %4 \n"
+               "push %5 \n"
+               "call *%6 \n"
+               "pop %%ebx \n"
+               "pop %%ebx \n"
+               "pop %%ebx \n"
+               "pop %%ebx \n"
+               "pop %%ebx \n"
+               : "=a"(ret)
+               : "r"(r->edi), "r"(r->esi), "r"(r->edx), "r"(r->ecx),
+                 "r"(r->ebx), "r"(handler));
+  r->eax = ret;
 }
 
 void* userm_malloc(size_t size)
@@ -284,7 +285,7 @@ int acpi_enable(void)
       {
         if ((inw((unsigned int)PM1a_CNT) & SCI_EN) == 1)
           break;
-        wait(10);
+        delay(10);
       }
       if ((int)PM1b_CNT != 0)
         for (; i < 300; i++)
@@ -456,4 +457,22 @@ void restxt()
 void resvid()
 { // reserves the video memory
   sys_resmem((void *)0xA0000, 200 * 320 + 1);
+}
+
+void sys_exit(void* arg1)
+{
+  struct proc p = myproc();
+  prkill(&p);
+}
+
+// add more if needed
+void syscinit()
+{
+  sysc_add(1, sys_exit);
+  sysc_add(2, sys_read);
+  sysc_add(3, sys_write);
+  sysc_add(4, sys_malloc);
+  sysc_add(5, sys_free);
+  sysc_add(6, sys_open);
+  sysc_add(7, sys_mkdir);
 }
