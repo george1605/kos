@@ -84,16 +84,18 @@ void init()
   idt_init();
   gdt_init();
   isrs_init();
-  sysc_load();
   irq_init();
   fpu_init();
   sse_init();
+  ioapic_init(); // init these, would need for multiproc.
+  lapicinit();
   proc_init();
   pci_init();
   kbd_init();
   mouse_init();
   timer_init();
   switch_long_mode();
+  sysc_load();
   kprint("x64 Mode Activated. (Respect +)");
   fs_init();
   vfsinit();

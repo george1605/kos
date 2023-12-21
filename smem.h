@@ -5,6 +5,9 @@
 #define M_BOTH 16
 #define M_USED 32
 #define M_STATIC 128
+#define PAGE_PRESENT  0x1
+#define PAGE_WRITABLE 0x2
+#define PAGE_USER     0x4
 #include "lib.c"
 #include "mem.h"
 #define PAGE_ALLIGN(x) (void *)(x - x % 4096 + 4096)
@@ -195,6 +198,47 @@ struct farptr
   uint16_t off;
 };
 
+typedef uint32_t pagetblentry_t;
+
+typedef struct {
+    pagetblentry_t entries[1024];
+} pagetable;
+
+typedef struct {
+  struct {
+    void* ptr;
+    size_t size;
+    int free;
+  } * blocks;
+  int num_blocks;
+} arena;
+
+void* arena_alloc(arena* ar, size_t size, void*(*def_alloc)(size_t))
+{
+  for(int i = 0;i < ar->num_blocks;i++)
+    if(ar->blocks[i].free == 0 && ar->blocks[i].size == size)
+      return ar->blocks[i].ptr;
+  
+  return def_alloc(size);
+}
+
+// blocks of size 1,2,4,8..2^n
+arena* arena_setup(size_t numblks)
+{
+  arena* ar = (arena*)kalloc(sizeof(numblks), KERN_MEM);
+  ar->blocks = kalloc(sizeof(*ar->blocks), KERN_MEM);
+  int p = 1;
+  for(int i = 0;i < numblks;i++)
+  {
+    ar->blocks[i].free = 1;
+    ar->blocks[i].size = p;
+    ar->blocks[i].ptr = vmap(NULL_PTR, p, PAGE_USER | PAGE_WRITABLE, (struct vfile*)NULL_PTR);
+    p *= 2;
+  }
+  ar->num_blocks = numblks;
+  return ar;
+}
+
 void *getptr(struct farptr u)
 {
   void *ptr = (void *)(u.base * 0x10 + u.off);
@@ -332,6 +376,13 @@ void* map_page(void* physaddr, void* virtualaddr, size_t flags)
     return virtualaddr;
 }
 
+void add_to_ptable(pagetable* tbl, void* virt, void* phys)
+{
+  uint64_t pdindex = (uint64_t)virt >> 22;
+  uint64_t ptindex = (uint64_t)virt >> 12 & 0x03FF;
+  
+}
+
 void *get_phys(void *virtualaddr)
 {
   uint64_t pdindex = (uint64_t)virtualaddr >> 22;
@@ -349,10 +400,28 @@ void enable_paging(uint64_t address)
   asm volatile("movl %0, %%cr3":"r"(address), "=r"(__ignore));
 }
 
-static inline void tlb_flush(unsigned long addr) // invalidates a page
+static inline void tlb_flush(uint64_t addr) // invalidates a page
 {
   asm volatile("invlpg (%0)" ::"r"(addr)
                : "memory");
+}
+
+void mem_unmap(pagetable* table)
+{
+  CLI();
+  for(int i = 0;i < 1024;i++)
+  {
+    if (table->entries[i] & PAGE_PRESENT) {
+        uint32_t page_table_address = table->entries[i] & 0xFFFFF000;
+        pagetable* page_table = (pagetable*)page_table_address;
+        for (int j = 0; j < 1024; ++j) {
+            page_table->entries[j] = 0;
+        }
+        table->entries[i] = 0;
+    }
+  }
+  tlb_flush((size_t)table);
+  STI();
 }
 
 void *ioremap(void* x, size_t len)

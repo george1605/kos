@@ -3,7 +3,7 @@
 #include "lib.c"
 #include "smem.h"
 #include "pipe.c"
-#include "vfs.h"
+#include "process.h"
 #define ELF_32 2
 #define ELF_64 4
 
@@ -60,16 +60,27 @@ typedef void(*entry_t)(void);
 entry_t elfloadall(struct ElfHeader* hdr)
 {
   struct ProgramHeader* ph = (struct ProgramHeader*)((uint8_t*)hdr + hdr->e_phoff), *endph;
-  endph = ph + ph->p;
+  endph = ph + ph->p_memsz;
   void* pa;
-  for(;ph < eph;ph++)
+  for(;ph < endph;ph++)
   {
     pa = ph->p_addr;
-    readseg(pa, ph->filesz, ph->off);
-    if(ph->memsz > ph->filesz)
-      stosb(pa + ph->filesz, 0, ph->memsz - ph->filesz);
+    readseg(pa, ph->p_filesz, ph->p_offset);
+    if(ph->p_memsz > ph->p_filesz)
+      stosb(pa + ph->p_filesz, 0, ph->p_memsz - ph->p_filesz);
   }
   return (entry_t)(hdr->e_entry);
+}
+
+// read ELF, load it and execute it
+void elfreadexec(struct vfile* vf)
+{
+  struct ElfHeader* header = kalloc(sizeof(struct ElfHeader), KERN_MEM);
+  entry_t entry = elfloadall(header);
+  struct proc p = prcreat(vf->name);
+  p.f = entry; // set the function pointer to the entry
+  prappend(p); // add to the list
+  sched(); // reschedule it
 }
 
 struct ElfSection

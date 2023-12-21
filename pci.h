@@ -6,7 +6,20 @@
 #define AMDGPU 0x1022
 #define INTELD 0x8086
 
-#define PCI_BAR4 0x020
+#define PCI_PROG_IF  0x09 // 1
+#define PCI_SUBCLASS 0x0a // 1
+#define PCI_CLASS    0x0b // 1
+#define PCI_CACHE_LINE_SIZE 0x0c // 1
+#define PCI_LATENCY_TIMER   0x0d // 1
+#define PCI_HEADER_TYPE     0x0e // 1
+#define PCI_BIST            0x0f // 1
+#define PCI_BAR0            0x10 // 4
+#define PCI_BAR1            0x14 // 4
+#define PCI_BAR2            0x18 // 4
+#define PCI_BAR3            0x1C // 4
+#define PCI_BAR4            0x20 // 4
+#define PCI_BAR5            0x24 // 4
+
 #define PCI_ADDR 0xCF8
 #define PCI_DATA 0xCFC
 #define FL_BASE_MASK 0x0007
@@ -16,6 +29,12 @@
 #define FL_BASE3 0x0003
 #define FL_BASE4 0x0004
 #define FL_GET_BASE(x) (x & FL_BASE_MASK)
+
+#define PCI_VENDOR_ID            0x00 // 2
+#define PCI_DEVICE_ID            0x02 // 2
+#define PCI_COMMAND              0x04 // 2
+#define PCI_STATUS               0x06 // 2
+#define PCI_REVISION_ID          0x08 // 1
 
 #define PCI_CLASS_UNCLASSIFIED 0x0
 #define PCI_CLASS_STORAGE 0x1
@@ -100,6 +119,27 @@ size_t pciget(struct pcidev dev, size_t field)
 		return t;
 	}
 	return 0xffff;
+}
+
+static inline int pci_extract_bus(uint32_t device) {
+	return (uint8_t)((device >> 16));
+}
+static inline int pci_extract_slot(uint32_t device) {
+	return (uint8_t)((device >> 8));
+}
+static inline int pci_extract_func(uint32_t device) {
+	return (uint8_t)(device);
+}
+
+uint32_t* pcie_addr(uint32_t device, int field) {
+	return (uint32_t*)((pci_extract_bus(device) << 20) | (pci_extract_slot(device) << 15) | (pci_extract_func(device) << 12) | (field));
+}
+
+struct vfile* pcie_map(uint32_t device, int field) {
+	struct vfile* vf = (struct vfile*)kalloc(sizeof(struct vfile), KERN_MEM);
+	vf->mem = pcie_addr(device, field);
+	vf->drno = device;
+	return vf;
 }
 
 void pciset(struct pcidev dev, size_t field, size_t value)
@@ -298,7 +338,7 @@ inline size_t pci_baseaddr(uint8_t idx, struct pcidev dev)
 	size_t bar = pciread(dev.bus, dev.slot, dev.func, 0x10 + (idx * sizeof(uint32_t)));
 	if (!(bar & 0x1)  && bar & 0x4  && idx < 5)
 	{
-		bar |= (size_t)(pciwrites(dev.bus, dev.slot, dev.func, 0x10 + ((bar + 1) * sizeof(uint32_t)))) << 32;
+		bar |= ((size_t)(pciwrites(dev.bus, dev.slot, dev.func, 0x10 + ((bar + 1) * sizeof(uint32_t)), 0)) << 32); // what is happening here? must fix
 	}
 
 	return (bar & 0x1) ? (bar & 0xFFFFFFFFFFFFFFFC) : (bar & 0xFFFFFFFFFFFFFFF0);
@@ -306,9 +346,14 @@ inline size_t pci_baseaddr(uint8_t idx, struct pcidev dev)
 
 struct vfile* pci_vfsmap(struct pcidev dev)
 {
-	struct vfile* vf = kalloc(sizeof(struct vfile), KERN_MEM);
+	struct vfile* vf = (struct vfile*)kalloc(sizeof(struct vfile), KERN_MEM);
 	vf->drno = dev.device;
-	vf->mem = pci_baseaddr(0, dev);
+	vf->mem = (void*)pci_baseaddr(0, dev);
 	vf->refcnt = 1;
 	return vf;
+}
+
+uint16_t pci_find_type(uint32_t dev) {
+	pcidev d = {.device = dev};
+	return (pciget(d, PCI_CLASS) << 8) | pciget(d, PCI_SUBCLASS);
 }

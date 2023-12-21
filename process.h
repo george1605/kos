@@ -115,7 +115,8 @@ struct environ
 
 char* strenv(char* name, char* val)
 {
-  char* buf = alloc(0, 64), x = strlen(name);
+  char* buf = (char*)kalloc(128, KERN_MEM);
+  size_t x = strlen(name);
   memcpy(buf, name, x);
   buf[x++] = '=';
   memcpy(buf + x, val, strlen(val));
@@ -231,12 +232,12 @@ void prinit(struct proc u, struct proc *parent)
 {
   u.pid = (++lpid);
   u.state = STARTED;
-  u.stack = alloc(0, 64);
+  u.stack = (char*)kalloc(64 * 1024, USER_MEM);
   if (parent == (struct proc *)0)
     u.parent = &tproc;
   else
     u.parent = parent;
-  tproc = u;
+  sched();
 }
 
 struct proc prcreat(char *prname)
@@ -281,6 +282,7 @@ struct proc prnew(int pid)
   x.parent = &tproc;
   x.stack = alloc(0, 64);
   x.state = STARTED;
+  return x; // <-- How could I forget this?
 }
 
 struct proc procid(int pid) // if it doesn't find a process, it creates one
@@ -341,6 +343,28 @@ int prkill(struct proc* u)
   prswap(*(u->parent));
   sched(); // reschedule 
   return u->ret;
+}
+
+#define MAX_EXITFUNCS 10
+struct exithnd
+{
+  void(*f[MAX_EXITFUNCS])();
+  int num_funcs;
+};
+
+void kprexit(struct proc* p, int code)
+{
+  struct exithnd* exit = (struct exithnd*)(p->stack + p->ssize - sizeof(struct exithnd));
+  for(int i = 0;i < exit->num_funcs;i++)
+      exit->f[i]();   
+  p->ret = code;
+  prkill(p); // kill the current proc
+}
+
+// log to the console when it exits
+void klogproc(struct proc* p)
+{
+  printf("Process: pid=%i exited with code=%i", p->pid, p->ret);
 }
 
 void prend(struct proc u, int status)
@@ -446,6 +470,13 @@ void mmap(void* mem, int flags, struct proc p) // maps a memory region to a proc
   if(mem == NULL) return;
   if(mem < KERN_MEM)
     p.stack = _vm(mem); // just temporary
+}
+
+// adds a heap to the process
+void praddheap(struct proc* p)
+{
+  pagetable* tbl = (pagetable*)p->stack;
+  add_to_ptable(tbl, (void*)0x1, p->stack + sizeof(pagetable)); 
 }
 
 void envinit(struct environ *u)

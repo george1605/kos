@@ -515,6 +515,30 @@ void kprint(char *text)
   }
 }
 
+void printint(int xx, int base, int sign)
+{
+  char digits[] = "0123456789abcdef";
+  char buf[16];
+  int i;
+  uint8_t x;
+
+  if(sign && (sign = xx < 0))
+    x = -xx;
+  else
+    x = xx;
+
+  i = 0;
+  do{
+    buf[i++] = digits[x % base];
+  }while((x /= base) != 0);
+
+  if(sign)
+    buf[i++] = '-';
+
+  while(--i >= 0)
+    putch(buf[i]);
+}
+
 void perror(char *text)
 {
   while (*text)
@@ -542,7 +566,7 @@ void pwarn(char *text)
 void vsnprintf(char* buf, size_t sz, const char* fmt, va_list args)
 {
   char m;
-  while(*fmt)
+  while(*fmt && sz > 0)
   {
     m = *fmt; 
     fmt++;
@@ -551,7 +575,20 @@ void vsnprintf(char* buf, size_t sz, const char* fmt, va_list args)
       m = *(fmt++);
       switch(m)
       {
-
+      case 'i':
+        char* s = itoa(*(int*)args, buf, sz);
+        args += sizeof(int);
+        sz -= (s - buf); // decrease the size
+      break;
+      case 's':
+        int l = min(sz, strlen(*(char**)args));
+        memcpy(buf, *(char**)args, l);
+        args += sizeof(char*);
+        sz -= l;
+      break;
+      case 'p':
+        
+      break;
       }
     } else {
       *buf++ = *fmt;

@@ -187,6 +187,42 @@ static int xhci_command(struct xhcictrlinfo * controller, uint32_t p1, uint32_t 
 	return 0;
 }
 
+size_t xhci_write(struct vfile* node, size_t offset, size_t size, uint8_t * buffer) {
+	struct xhcictrlinfo * controller = (struct xhcictrlinfo*)node->mem;
+	if (size != sizeof(struct xhci_trb)) return -1;
+	struct xhci_trb * data = (struct xhci_trb*)buffer;
+	xhci_command(controller, data->trb_thing_a, data->trb_thing_b, data->trb_status, data->trb_control);
+	return sizeof(struct xhci_trb);
+}
+
+void find_xhci(uint32_t device, uint16_t v, uint16_t d, void * extra)
+{
+  if (pci_find_type(device) != 0x0C03) return;
+  struct pcidev _d = {.device = device};
+	if (pciget(_d, PCI_PROG_IF) != 0x30) return;
+	struct vfile* vf = (struct vfile*)extra;
+
+	uint16_t command_reg = pciget(_d, PCI_COMMAND);
+	command_reg |= (1 << 2);
+	command_reg |= (1 << 1);
+	pciset(_d, PCI_COMMAND, command_reg);
+
+	/* The mmio address is 64 bits and combines BAR0 and BAR1... */
+	uint64_t addr_low  = pciget(_d, PCI_BAR0) & 0xFFFFFFF0;
+	uint64_t addr_high = pciget(_d, PCI_BAR1) & 0xFFFFFFFF; /* I think this is right? */
+	uint64_t mmio_addr = (addr_high << 32) | addr_low;
+
+	if (mmio_addr == 0) {
+		/* Need to map... */
+		return;
+		#if 0
+		mmio_addr = mmu_allocate_n_frames(2) << 12;
+		pci_write_field(device, PCI_BAR0, 4, (mmio_addr & 0xFFFFFFF0) | (1 << 2));
+		pci_write_field(device, PCI_BAR1, 4, (mmio_addr >> 32));
+		#endif
+	}
+}
+
   int xhcinew()
   {
     enable_mastering(0, 0, 0);
