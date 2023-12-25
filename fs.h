@@ -10,6 +10,7 @@
 #define F_DIR 32
 #define F_DEV 64 /* device file */
 #define F_EXEC 0xFF
+#define F_VIRT 0x100 /* generic vfile - may be F_DEV (or not) */
 #define NDEV 16
 #define NDIRECT 12
 #define NINDIRECT (512 / sizeof(size_t))
@@ -127,6 +128,27 @@ void unveil(const char *path, int perm)
 
   if(savetbl(0, &ft) == -1)
     perror("FileTable could not be saved!");
+}
+
+// file name like "1:/what.txt"(drive D in windows)
+struct file findfile(const char* name)
+{
+  int dsk = 0, c = 0; // by default the first file
+  if(name[1] == ':') {
+    dsk = (name[0] - '0');
+    name += 2;
+  }
+  struct ftable ft = loadtbl(dsk);
+  for(c = 0;c < ft.fcnt;c++) {
+    if(strcmp(ft.files[c].name, (char*)name) == 0)
+      return ft.files[c];
+  }
+  return (struct file){.name = (char*)NULL_PTR, .fd = -1};
+}
+
+int fperms(struct file file, int wanted)
+{
+  return (file.flags & wanted);
 }
 
 void free_fd(int fd)

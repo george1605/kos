@@ -196,7 +196,7 @@ int writeio(char *buf, int p)
   return -1;
 }
 
-struct bldev *blkcreat(char *name)
+struct blkdev *blkcreat(char *name)
 {
   struct blkdev *u;
   u->name = name;

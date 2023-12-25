@@ -65,6 +65,17 @@ int fdalloc()
   return 0xFF;
 }
 
+int fdremap(int fd, struct file* ofiles)
+{
+  int f = fd % (MAX_FDS - 2) + 2; // <-- may replace with another hash function
+  if(ofiles[f].fd == 0)
+    return f;
+  for(int i = 0;i < MAX_FDS;i++)
+    if(ofiles[i].fd == 0)
+      return i;
+  return -1; // -1 elsewhere
+}
+
 void vfsunlink(struct vfile* chvf)
 {
   struct vfile* p = chvf->parent;
@@ -358,7 +369,7 @@ struct vfile rfs_open(char *name)
 void rfs_write(struct vfile u, const char *a, int size)
 {
   if (a != (char *)0 && size != 0)
-    memcpy(u.fd, a, size);
+    memcpy((char*)u.fd, a, size);
 }
 
 void* vmap(void* location, size_t size, size_t flags, struct vfile* file)

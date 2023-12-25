@@ -32,6 +32,8 @@ void cons(int argc, char **argv)
     return;
 }
 
+#define MAX_FDS 20
+
 struct proc
 {
   prstate state;
@@ -44,7 +46,29 @@ struct proc
   void *ctx; // used for fxrestor(), fxsave()
   int ssize;
   func f;
+  struct file* ofiles;
 } tproc, kproc;
+
+void praddvfile(struct proc* p, struct vfile* vf)
+{
+ int fd = vf->fd;
+ if(vf->fd > MAX_FDS) // remap the file descriptor to the file map
+ {
+    fd = fdremap(vf->fd, p->ofiles);
+ }  
+ p->ofiles[fd].flags = vf->status | F_VIRT;
+ p->ofiles[fd].name = vf->name;
+ p->ofiles[fd].parent = vf->parent;
+}
+
+void praddfile(struct proc* p, struct file* fi)
+{
+  if(p == NULL_PTR || fi == NULL_PTR) return;
+  int fd = fi->fd;
+  if(fi->fd > MAX_FDS)
+    fd = fdremap(fi->fd, p->ofiles);
+  p->ofiles[fd] = *fi;
+}
 
 struct prset
 {
@@ -90,14 +114,6 @@ struct proc prnew_k(char* name, int memSize)
   return p;
 }
 
-// create a process with the same name, link with the parent proc + copy the mem
-struct proc prfork()
-{
-  struct proc parent = myproc();
-  struct proc p = prnew_k(parent.name, parent.ssize);
-  p.parent = &parent;
-  memcpy(p.stack, parent.stack, parent.ssize);
-}
 
 struct sleeplock
 {
@@ -193,6 +209,16 @@ struct proc myproc(void)
   return (*p);
 }
 
+// create a process with the same name, link with the parent proc + copy the mem
+struct proc prfork()
+{
+  struct proc parent = myproc();
+  struct proc p = prnew_k(parent.name, parent.ssize);
+  p.parent = &parent;
+  memcpy(p.stack, parent.stack, parent.ssize);
+  return p;
+}
+
 // returns the process currently running
 struct proc* prswitch(struct proc* p)
 {
@@ -268,11 +294,15 @@ void proc_exit()
   glsig = SHUTDOWN;
 }
 
-void prswap(struct proc u)
+void prswap(struct proc* u)
 {
-  HALT();
-  tproc = u;
-  u.f(0, (char **)0);
+  struct cpu* cpu = mycpu();
+  cpu->proc = u;
+  fxsave(u->ctx);
+  char** argv = (char**)kalloc(2 * sizeof(char*), USER_MEM);
+  argv[0] = u->name;
+  argv[1] = NULL_PTR;
+  u->f(1, argv);
 }
 
 struct proc prnew(int pid)
@@ -312,7 +342,7 @@ void waitpid(int pid)
   struct proc u = procid(pid);
   while(u.state == KILLED)
   {
-    prswap(tproc);
+    prswap(&tproc);
   }
 }
 
@@ -323,7 +353,7 @@ void prsswap(struct proc prlist[], int procs)
   while (a < procs)
   {
     if (t.state != KILLED)
-      prswap(t);
+      prswap(&t);
 
     t = prlist[++a];
   }
@@ -340,7 +370,7 @@ int prkill(struct proc* u)
   free((int *)u->stack);
   u->stack = (char*)NULL_PTR;
   fxrestor(u->parent->ctx);
-  prswap(*(u->parent));
+  prswap(u->parent);
   sched(); // reschedule 
   return u->ret;
 }
@@ -358,6 +388,9 @@ void kprexit(struct proc* p, int code)
   for(int i = 0;i < exit->num_funcs;i++)
       exit->f[i]();   
   p->ret = code;
+  for(int i = 0;i < MAX_FDS;i++)
+    if(p->ofiles[i].fd != -1)
+      fclose(p->ofiles[i]); // close the files
   prkill(p); // kill the current proc
 }
 
@@ -371,12 +404,6 @@ void prend(struct proc u, int status)
 {
   prkill(&u);
   kprint("Process ended with status: ");
-}
-
-void exitk()
-{ // enters the kernel
-  prkill(&tproc);
-  prswap(kproc);
 }
 
 void dbgret(int code)

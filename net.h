@@ -46,6 +46,8 @@
 #define PF_X25		AF_X25
 #define PF_INET6	AF_INET6
 
+#define E1000_NUM_RX_DESC 512
+#define E1000_NUM_TX_DESC 512
 #define RX_BUF_SIZE 8192
 #define RX_READ_POINTER_MASK (~3)
 #define ETHERNET_TYPE_ARP 0x0806
@@ -195,6 +197,7 @@ e1000info* global_e1000;
 #define E1000_REG_CTRL 		    0x0000
 #define E1000_REG_EEPROM 		0x0014
 #define E1000_REG_IMASK 		0x00D0
+#define E1000_REG_RXADDR        0x5400
 
 void e1000write_l(e1000info *e, uint16_t addr, uint32_t val)
 {
@@ -248,6 +251,17 @@ void e1000getmac(e1000info *e, char *mac)
 	mac[5] = temp >> 8;
 }
 
+void e1000setmac(e1000info *e, char* mac)
+{
+    uint32_t low, high;
+	memcpy(&low, &mac[0], 4);
+	memcpy(&high,&mac[4], 2);
+	memset((uint8_t*)&high + 2, 0, 2);
+	high |= 0x80000000;
+	e1000write_l(e, E1000_REG_RXADDR + 0, low);
+	e1000write_l(e, E1000_REG_RXADDR + 4, high);
+}
+
 void e1000enableint(e1000info *e)
 {
 	e1000write_l(e, E1000_REG_IMASK ,0x1F6DC);
@@ -261,3 +275,36 @@ void e1000setup()
     e1000getmac(global_e1000, (char*)&mac);
     e1000enableint(global_e1000);
 }
+
+struct etherdev {
+    char if_name[32];
+	uint8_t mac[6];
+	size_t mtu;
+	uint32_t ipv4_addr;
+	uint32_t ipv4_subnet;
+	uint32_t ipv4_gateway;
+	uint8_t ipv6_addr[16];
+};
+
+typedef struct {
+	struct etherdev eth;
+	uint32_t pci_device;
+	uint16_t deviceid;
+	uint32_t* mmio_addr;
+	int irq_number;
+
+	int has_eeprom;
+	int rx_index;
+	int tx_index;
+	int link_status;
+
+	struct spinlock tx_lock;
+
+	uint8_t * rx_virt[E1000_NUM_RX_DESC];
+	uint8_t * tx_virt[E1000_NUM_TX_DESC];
+	volatile struct e1000_rx_desc * rx;
+	volatile struct e1000_tx_desc * tx;
+	uint32_t* rx_phys;
+	uint32_t* tx_phys;
+
+} e1000nic;

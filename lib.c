@@ -267,12 +267,14 @@ struct cpu
 {
   int cid;
   int ncli;
+  int intena;
   volatile size_t started;
   struct proc *proc;
   struct context *scheduler;
 };
 
 struct cpu cpus[32]; // max 32 cores - to be changed after no. cores goes brrr
+struct cpu* mycpu(void);
 
 struct spinlock
 {
@@ -285,7 +287,7 @@ struct spinlock
 void initlock(struct spinlock *u, char *name)
 {
   u->locked = 0;
-  u->cpu = 0;
+  u->cpu = mycpu();
   u->name = name;
 }
 
@@ -327,6 +329,37 @@ void popcli(struct cpu *_cpu)
     _cpu->ncli--;
 }
 
+struct resinfo 
+{
+  int type; // like RES_FILE, RES_ADDR, RES_IMAGE etc.
+  void* handle;
+  void* used_by; // process that uses this
+};
+
+struct reslock
+{
+  struct spinlock lock;
+  struct resinfo info;
+};
+
+void resinit(struct reslock* res, struct resinfo info)
+{
+  res->info = info;
+  initlock(&(res->lock), NULL_PTR);
+}
+
+void resacq(struct reslock* lock)
+{
+  if(lock->info.handle == NULL_PTR) return; // if no resource then it 
+  acquire(&(lock->lock));
+}
+
+void resrel(struct reslock* lock)
+{
+  if(lock->info.handle == NULL_PTR) return; // if no resource then it 
+  release(&(lock->lock));
+}
+
 char *BUFFER = (char *)0xB8000;
 int csr_x = 0, csr_y = 0, attrib = 0x0F;
 
@@ -347,6 +380,40 @@ static inline int strcon(char *str, char ch)
     str++;
   }
   return 1;
+}
+
+static inline int strchr(char *str, char ch)
+{
+  int i = 0;
+  while (str[i] != 0)
+  {
+    if (str[i] == ch)
+      return i;
+    str++;
+  }
+  return -1;
+}
+
+static inline char* substr(char* x, size_t start, size_t size)
+{
+  char* p = kalloc(size + 1, KERN_MEM);
+  memcpy(p, x + start, size);
+  return p;
+}
+
+// a simplistic version of strtok
+static char* __strtok_last = NULL_PTR; 
+static inline char* strtok0(char* str, char sep)
+{
+  if(str == NULL_PTR) str = __strtok_last;
+  if(!__strtok_last && !str)
+  {
+    __strtok_last = NULL_PTR; // resets the pointer, if you use strtok for n different strings
+    return NULL_PTR;
+  }
+  int p = strchr(str, sep);
+  __strtok_last = str + p + 1;
+  return substr(str, 0, p);
 }
 
 static inline void outportb(uint16_t port, uint8_t data)
@@ -606,6 +673,10 @@ void printf(char* code, ...)
   kprint(buf);
   va_end(list);
 }
+
+#define assert(x) do {  \
+    if(!(x)) printf("Assert failed: %s @ %s:%i", #x, __FILE__, __LINE__); \
+} while(0)
 
 void kersc()
 {

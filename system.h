@@ -83,11 +83,13 @@ __SYSCALL void sys_exec(void *arg1, void *arg2)
 
 __SYSCALL int sys_open(void *arg1, void *arg2)
 {
-  struct vfile vf;
-  struct file fil;
+  int fd = vfscheck((char*)arg1); // gets the fd of a virtual file
+  if(fd > -1)
+    return fd;
 
-  vf = vfsopen(arg1);
-  return vf.fd;
+  struct file f = findfile((char*)arg1);
+  f.flags = fperms(f, (int)arg2);    
+  return f.fd; 
 }
 
 __SYSCALL void sys_mkdir(void *arg1, void *arg2)
