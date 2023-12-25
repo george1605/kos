@@ -198,7 +198,7 @@ struct cpu *mycpu(void)
   return &(cpus[i]);
 }
 
-struct proc myproc(void)
+struct proc* myproc(void)
 {
   struct cpu *c;
   struct proc *p;
@@ -206,16 +206,16 @@ struct proc myproc(void)
   c = mycpu();
   p = c->proc;
   popcli(c);
-  return (*p);
+  return p;
 }
 
 // create a process with the same name, link with the parent proc + copy the mem
 struct proc prfork()
 {
-  struct proc parent = myproc();
-  struct proc p = prnew_k(parent.name, parent.ssize);
-  p.parent = &parent;
-  memcpy(p.stack, parent.stack, parent.ssize);
+  struct proc* parent = myproc();
+  struct proc p = prnew_k(parent->name, parent->ssize);
+  p.parent = parent;
+  memcpy(p.stack, parent->stack, parent->ssize);
   return p;
 }
 
@@ -297,11 +297,11 @@ void proc_exit()
 void prswap(struct proc* u)
 {
   struct cpu* cpu = mycpu();
+  fxsave(cpu->proc->ctx); // save the prev process
   cpu->proc = u;
-  fxsave(u->ctx);
   char** argv = (char**)kalloc(2 * sizeof(char*), USER_MEM);
   argv[0] = u->name;
-  argv[1] = NULL_PTR;
+  argv[1] = (char*)NULL_PTR;
   u->f(1, argv);
 }
 
@@ -404,12 +404,6 @@ void prend(struct proc u, int status)
 {
   prkill(&u);
   kprint("Process ended with status: ");
-}
-
-void dbgret(int code)
-{
-  tproc.ret = code;
-  exitk();
 }
 
 void prexec(int argv, char **argc)

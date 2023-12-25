@@ -73,10 +73,10 @@ struct vfile* parmap(char *fname, struct pardev i)
 // link both the stdin and stdout to the parallel port
 void parlink(struct pardev p)
 {
-    struct proc pr = myproc();
+    struct proc* pr = myproc();
     struct vfile* file = parmap(NULL_PTR, p);
-    vfslink2(file, &(pr.std[1]));
-    vfslink2(file, &(pr.std[0]));
+    vfslink2(file, &(pr->std[1]));
+    vfslink2(file, &(pr->std[0]));
 }
 
 char *parread(struct pardev u, size_t size)

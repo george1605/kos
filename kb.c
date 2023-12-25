@@ -109,9 +109,30 @@ unsigned char kbdus[128] =
 void getc_stdin()
 {
   int code = inportb(0x60);
-  struct proc p = myproc();
-  char* s = (char*)p.std[0].mem;
+  struct proc* p = myproc();
+  char* s = (char*)p->std[0].mem;
   s[0] = code;
+}
+
+void keyboard_wait()
+{
+  while (inportb(0x60) & 0x20 != 0)
+    ;
+}
+
+void gets_stdin(int until)
+{
+  int code = inportb(0x60);
+  int c = 0;
+  struct proc* p = myproc();
+  while(code != until && c < p->std[0].size)
+  {
+    keyboard_wait();
+    code = inportb(0x60);
+    p->std[0].mem[c] = code;
+    c++;
+  }
+  p->std[0].mem[c] = '\0';
 }
 
 char *kbdbuf = (char *)(0x2C00FF);
@@ -134,12 +155,6 @@ void keyboard_handler(struct regs *r)
 
     kbdbuf[kbdindex++] = kbdus[scancode];
   }
-}
-
-void keyboard_wait()
-{
-  while (inportb(0x60) & 0x20 != 0)
-    ;
 }
 
 int getch()

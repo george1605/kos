@@ -94,8 +94,8 @@ void* iomapping(long addr)
   if (addr > 0xffffffff)
   { 
     perror("Address is bigger than 4MB");
-    return 0xffffffff;
+    return (void*)0xffffffff;
   }
 
-  return addr + IO_VIRTUAL_BASE;
+  return (void*)(addr + IO_VIRTUAL_BASE);
 }

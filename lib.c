@@ -396,8 +396,10 @@ static inline int strchr(char *str, char ch)
 
 static inline char* substr(char* x, size_t start, size_t size)
 {
+  if(x == NULL_PTR) return (char*)NULL_PTR;
   char* p = kalloc(size + 1, KERN_MEM);
   memcpy(p, x + start, size);
+  p[size - 1] = '\0';
   return p;
 }
 
@@ -408,8 +410,8 @@ static inline char* strtok0(char* str, char sep)
   if(str == NULL_PTR) str = __strtok_last;
   if(!__strtok_last && !str)
   {
-    __strtok_last = NULL_PTR; // resets the pointer, if you use strtok for n different strings
-    return NULL_PTR;
+    __strtok_last = (char*)NULL_PTR; // resets the pointer, if you use strtok for n different strings
+    return (char*)NULL_PTR;
   }
   int p = strchr(str, sep);
   __strtok_last = str + p + 1;

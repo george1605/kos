@@ -121,6 +121,8 @@ void fault_handler(struct regs *r)
     if (r->int_no < 32)
     {
         perror(exception_messages[r->int_no]);
+        if(r->int_no == 14)
+            kprexit(myproc(), 11); // <-- Caught fatal signal 11
         asm("pause");
     } else if(r->int_no == 0x80) {
         sysc_handler(r);

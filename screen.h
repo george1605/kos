@@ -245,10 +245,10 @@ struct vfile* vidvirt(int flags)
 // links it with the stdout (std[1])
 void vidreq()
 {
-   struct proc p = myproc();
+   struct proc* p = myproc();
    struct vfile* vf = vidvirt(0);
    vf->mem = vmap(vf->mem, vf->size, 0, NULL_PTR);
-   vfslink2(vf, &(p.std[1]));
+   vfslink2(vf, &(p->std[1]));
 }
  
 int viddetect(void){

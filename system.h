@@ -9,6 +9,14 @@
 #include "user.h"
 #include "pci.h"
 #define __SYSCALL static inline 
+#define SYSCALL_EXIT 1
+#define SYSCALL_READ 2
+#define SYSCALL_WRITE 3
+#define SYSCALL_MALLOC 4
+#define SYSCALL_FREE 5
+#define SYSCALL_OPEN 6
+#define SYSCALL_MKDIR 7
+#define SYSCALL_FORK 8
 #define PORTMAX 0xFFFF
 #define SYSRES 0xC0DEBA5E /* system reserved space */
 int usermode = 0;
@@ -130,6 +138,12 @@ __SYSCALL void sys_read(void* arg1, void* arg2)
   _read(sys_int(arg1), a, 512);
 }
 
+__SYSCALL int sys_fork()
+{
+  struct proc* p = prfork();
+  return p->pid;
+}
+
 __SYSCALL void sys_rem(int fd)
 {
   if(fd <= 3) // cannot remove stdin/stdout
@@ -146,7 +160,7 @@ __SYSCALL void sys_free(void* ptr)
 {
   struct malloc_block* q;
   for(q = malloc_head;q != 0;q = q->next)
-    if(abs(ptr - q->mem) < q->size) // char* p = malloc(10); p++; free(p); <-- in this case it works
+    if(abs((size_t)ptr - (size_t)q->mem) < q->size) // char* p = malloc(10); p++; free(p); <-- in this case it works
       q->free = 0;
 }
 
@@ -185,22 +199,19 @@ void sysc_handler(struct regs *r)
 
 void* userm_malloc(size_t size)
 {
-  void* p;
-  asm volatile("mov %eax, $0x11;"
-               "mov %ebx, %0;"
-               "int $0x80"
-               :"r"(size));
-  int ig;
-  asm volatile("mov $0, %%eax":"=r"(p):"r"(ig));
-  return p;
+  uint32_t p;
+  asm volatile("int $0x80" : "=a"(p) : "a"(SYSCALL_MALLOC));
+  return (void*)p;
 }
 
 void userm_free(void* ptr)
 {
-  asm volatile("mov %eax, $0x12;"
-               "mov %ebx, %0;"
-               "int $0x80"
-               :"r"(ptr));
+  asm volatile("int $0x80" ::"a"(SYSCALL_FREE), "b"(ptr));
+}
+
+void userm_exit(int code)
+{
+  asm volatile("int $0x80" ::"a"(SYSCALL_EXIT), "b"(code));
 }
 
 void switch_userm()
@@ -264,7 +275,7 @@ struct rsdp_desc* rsdp_find()
 {
   int a;
   for (a = 0x01; a < 0x7BFF; a += 16)
-    if (strcmp(rsdp_sign, a) == 0)
+    if (strcmp(rsdp_sign, (char*)a) == 0)
       return (struct rsdp_desc *)a;
 
   for (a = 0xE0000; a < 0xFFFFF; a += 16)
@@ -294,7 +305,7 @@ int acpi_enable(void)
         {
           if ((inw((unsigned int)PM1b_CNT) & SCI_EN) == 1)
             break;
-          sleep(10);
+          delay(10);
         }
       if (i < 300)
       {
@@ -351,7 +362,7 @@ struct file getfile(char *name)
 
 void __SYSCALL sys_abort()
 {
-  prkill(tproc);
+  prkill(myproc());
 }
 
 uint32_t __SYSCALL sys_memsz()
@@ -463,8 +474,8 @@ void resvid()
 
 void sys_exit(void* arg1)
 {
-  struct proc p = myproc();
-  prkill(&p);
+  struct proc* p = myproc();
+  kprexit(p, (int)arg1);
 }
 
 // add more if needed
