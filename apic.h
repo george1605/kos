@@ -42,7 +42,7 @@ void apichnd(struct regs* r)
 void apicinit()
 {
     apicbase = apicreadb() & LOCAL_APIC_BASE;
-    apicvirt = iomapping(apicbase);
+    apicvirt = (long)iomapping(apicbase);
     idt_set_gate(0xFF, (unsigned)apichnd, 0x08, 0x8E);
     apicenable();
 }

@@ -2,34 +2,10 @@
 #define FL_IF 0x00000200 
 #define ERR_INTRON 0x3A
 #define ERR_UNKNOWNAPIC 0x3B
+#define CPU_ID 0x1
+#define CPU_NUM 0x2 // get cpu number
+#define CPU_PROC 0x3
 #include "lib.c"
-//emulates the CPU ;)
-struct _cpu {
-  char regs[4];
-  int pc;
-} cpu;
-
-void movax(char val){
-  cpu.regs[0] = val;
-}
-
-void movbx(char val){
-  cpu.regs[1] = val;
-}
-
-void cpuinc(){
-  cpu.pc++;
-}
-
-void cpudec(){
- if(cpu.pc > 0)
-   cpu.pc--;
-}
-
-void cpuclr(){
- cpu.regs = {0,0,0,0};
- cpu.pc = 0;
-}
 
 #define cpuid(level, a, b, c, d)                        \
   asm ("cpuid\n\t"                                        \
@@ -45,17 +21,20 @@ void cpuclr(){
 #define is_x64() sizeof(void*) == 4
 #define is_x86() sizeof(void*) == 8
 
+extern struct proc* myproc(void);
 void cpuctl(int id, int req, int *params)
 {
   switch (req)
   {
-    case 0:
+    case CPU_ID:
      if(params == 0) return;
      cpuid(params[0], params[1], params[2], params[3], params[4]);
     break;
-    case 1:
-     
+    case CPU_NUM:
+     *(struct cpu**)params = mycpu();
     break;
+    case CPU_PROC:
+     *(struct proc**)params = myproc();
     default:
      raise(-1);
     break;

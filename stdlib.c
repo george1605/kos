@@ -1,11 +1,9 @@
 #pragma once
 // Let's use the syscalls
-#include "system.h"
-#include "fs.h"
-#include "time.c"
+#include "usermode.h"
 
 #define F_ERROR 0xFF
-#define NULL NULL_PTR
+#define NULL (void*)0 // NULL_PTR only defined in kern mode
 #define RAND_MAX ((1 << 31) - 1)
 #define RAND_MIN -RAND_MAX - 1
 #define TRUE 1
@@ -33,10 +31,13 @@ FILE stdfiles[3];
 #define stdout &stdfiles[1]
 #define stderr &stdfiles[2]
 
-time_t time(int k){
-  if(k < 0)
-    return 0;
-  return cmos_read(SECS);
+time_t time(time_t* time){
+  if(time == NULL)
+    return userm_time();
+  else {
+    *time = userm_time();
+    return *time;
+  } 
 }
 
 void* malloc(size_t bytes){
@@ -104,7 +105,7 @@ void _setbuf(FILE* fp, char* buf)
 void _fwrite(void* data, size_t size, size_t count, FILE* fp)
 {
   size_t sz = size * count;
-  if(fp->_buf != NULL_PTR)
+  if(fp->_buf != NULL)
   {
     memcpy(fp->_buf, data, min(sz, fp->_bufsize)); // buffering
   }

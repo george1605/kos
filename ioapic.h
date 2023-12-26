@@ -1,8 +1,17 @@
 #pragma once
 #include "lib.c"
 #include "port.h"
+#include "mem.h"
 
-#define LID   0x0020/4 
+#define LID               0x0020/4
+#define ICRHI            (0x0310/4)   // Interrupt Command [63:32]
+#define ICRLO            (0x0300/4)   // Interrupt Command
+#define TIMER            (0x0320/4)   // Local Vector Table 0 (TIMER)
+#define LAPIC_INIT       0x00000500 
+#define LAPIC_STARTUP    0x00000600
+#define LAPIC_ASSERT     0x00004000   // Assert interrupt (vs deassert)
+#define LAPIC_DEASSERT   0x00000000
+#define LAPIC_LEVEL      0x00008000 
 #ifndef T_IRQ0
   #define T_IRQ0   32  
 #endif
@@ -40,7 +49,7 @@ static void ioapicwrite(int reg, size_t data)
   ioapic->data = data;
 }
 
-void ioapicinit(void)
+void ioapic_init(void)
 {
   int i, id, maxintr;
 
@@ -48,7 +57,7 @@ void ioapicinit(void)
   maxintr = (ioapicread(REG_VER) >> 16) & 0xFF;
   id = ioapicread(REG_ID) >> 24;
   if(id != ioapicid)
-    kprint("ioapicinit: id isn't equal to ioapicid!\n");
+    kprint("ioapicLAPIC_INIT: id isn't equal to ioapicid!\n");
 
   for(i = 0; i <= maxintr; i++){
     ioapicwrite(REG_TABLE+2*i, INT_DISABLED | (T_IRQ0 + i));
@@ -62,7 +71,6 @@ void ioapicenable(int irq, int cpunum)
   ioapicwrite(REG_TABLE+2*irq+1, cpunum << 24);
 }
 
-
 void lapicinit(){
    outb(0x22, (short)0x70);   // Select IMCR
    outb(0x23, inb(0x23) | 1);  
@@ -74,4 +82,33 @@ int lapicid()
     return 0;
 
   return lapic[LID] >> 24;
+}
+
+static void lapicw(int index, int value)
+{
+  lapic[index] = value;
+  (void)lapic[LID];  // wait for write to finish, by reading
+}
+
+void lapic_startup(uint8_t apicid, uint32_t addr)
+{
+  int i;
+  uint16_t *wrv;
+  outb(0x70, 0xF);  // offset 0xF is shutdown code
+  outb(0x71, 0x0A);
+  wrv = (uint16_t*)_vm((0x40<<4 | 0x67));  // Warm reset vector
+  wrv[0] = 0;
+  wrv[1] = addr >> 4;
+
+  lapicw(ICRHI, apicid<<24);
+  lapicw(ICRLO, LAPIC_INIT | LAPIC_LEVEL | LAPIC_ASSERT);
+  microdelay(200);
+  lapicw(ICRLO, LAPIC_INIT | LAPIC_LEVEL);
+  microdelay(100);    // should be 10ms, but too slow in Bochs!
+
+  for(i = 0; i < 2; i++){
+    lapicw(ICRHI, apicid<<24);
+    lapicw(ICRLO, LAPIC_STARTUP | (addr>>12));
+    microdelay(200);
+  }
 }

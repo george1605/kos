@@ -205,11 +205,13 @@ typedef struct {
 } pagetable;
 
 typedef struct {
-  struct {
-    void* ptr;
-    size_t size;
-    int free;
-  } * blocks;
+  void* ptr;
+  size_t size;
+  int free;
+} arenablk;
+
+typedef struct {
+  arenablk* blocks;
   int num_blocks;
 } arena;
 
@@ -219,6 +221,14 @@ void* arena_alloc(arena* ar, size_t size, void*(*def_alloc)(size_t))
     if(ar->blocks[i].free == 0 && ar->blocks[i].size == size)
       return ar->blocks[i].ptr;
   
+  return def_alloc(size);
+}
+
+void* arena_realloc(arena* ar, void* p, size_t size, void(*def_alloc)(size_t))
+{
+  for(int i = 0;i < ar->num_blocks;i++)
+    if(ar->blocks[i].ptr == p)
+
   return def_alloc(size);
 }
 
@@ -237,6 +247,12 @@ arena* arena_setup(size_t numblks)
   }
   ar->num_blocks = numblks;
   return ar;
+}
+
+// Allocates a chunk from the arena or gets a kernel
+arena* arena_kalloc(size_t numblks)
+{
+
 }
 
 void *getptr(struct farptr u)
@@ -349,8 +365,9 @@ char *strdup(char *x)
     return (char *)0;
 
   int len = strlen(x);
-  char *ptr = kalloc(len, USER_MEM);
+  char *ptr = (char*)kalloc(len + 1, USER_MEM);
   memcpy(ptr, x, len);
+  ptr[len - 1] = '\0';
   return ptr;
 }
 

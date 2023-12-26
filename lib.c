@@ -14,6 +14,7 @@
 #define TOINT(chr) chr << 24
 #define _POSIX 3
 #define _ESGUS 1 /* Extended Standard for Graphical Unix Systems */
+#define NCPU 32
 
 #define NORMAL_VGA 0xffff
 #define EXTENDED_VGA 0xfffe
@@ -140,7 +141,7 @@ size_t strlen(char *u)
 
 static inline void memset(void *dst, unsigned char value, size_t n)
 {
-  unsigned char *d = dst;
+  uint8_t *d = (uint8_t*)dst;
 
   while (n-- > 0)
   {
@@ -150,7 +151,7 @@ static inline void memset(void *dst, unsigned char value, size_t n)
 
 static inline void memsetw(void *dst, size_t value, size_t n)
 {
-  size_t *d = dst;
+  size_t *d = (size_t*)dst;
 
   while (n-- > 0)
   {
@@ -268,6 +269,7 @@ struct cpu
   int cid;
   int ncli;
   int intena;
+  uint8_t apicid;
   volatile size_t started;
   struct proc *proc;
   struct context *scheduler;
@@ -397,7 +399,7 @@ static inline int strchr(char *str, char ch)
 static inline char* substr(char* x, size_t start, size_t size)
 {
   if(x == NULL_PTR) return (char*)NULL_PTR;
-  char* p = kalloc(size + 1, KERN_MEM);
+  char* p = kalloc(size + 1, 2);
   memcpy(p, x + start, size);
   p[size - 1] = '\0';
   return p;
@@ -793,6 +795,21 @@ void *memmove(void *dst, const void *src, size_t n)
   return dst;
 }
 
+int memncmp(char* str1, char* str2, size_t len)
+{
+  int sz = 0;
+  while (*str1 != 0 && *str2 != 0 && sz < len)
+  {
+    if (*str1 > *str2) {
+      return 1;
+    } else if (*str1 < *str2) {
+      return -1;
+    } else;
+    str1++, str2++, sz++; // i was dumb
+  }
+  return 0;
+}
+
 int memcmp(char *str1, char *str2)
 {
   int is_eq = 1;
@@ -911,4 +928,10 @@ char *strstr(const char *s1, const char *s2)
     if (!memcmp(s1++, s2))
       return (char *)(s1 - 1);
   return 0;
+}
+
+void strcpy(char* dest, const char* src)
+{
+  int len = min(strlen(dest), strlen(src));
+  memcpy(dest, src, len);
 }

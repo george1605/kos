@@ -1,5 +1,4 @@
 #pragma once
-#include "fs.h"
 #include "net.h"
 #include "kb.c"
 #include "lib.c"
@@ -44,7 +43,7 @@ void vfsparse(struct vfile* head, char* path)
 struct vfile* vfslink(struct vfile* vf, char* path)
 {
   vf->refcnt++;
-  struct vfile* newf = kalloc(sizeof(struct vfile), KERN_MEM);
+  struct vfile* newf = (struct vfile*)kalloc(sizeof(struct vfile), KERN_MEM);
   memcpy(newf, vf, sizeof(struct vfile));
   newf->name = strdup(path);
   newf->parent = vf; // if they have the same fd then they are linked, then not
@@ -213,8 +212,9 @@ struct vfile vfsata(int dev, char *name)
   struct vfile i;
   i.drno = dev;
   i.fd = 0x1C0000 + u->data;
-  i.status = F_RDWR | F_DEV;
-  i.name = name;
+  i.status = 72; // 64 + 8
+  i.mem = u->mem_buffer;
+  i.name = strdup(name);
   return i;
 }
 
@@ -259,7 +259,7 @@ void vfsrem()
   int i;
   for (i = 0; i < 16; i++)
   {
-    free(sysvf[i].mem);
+    free((int*)(sysvf[i].mem));
     sysvf[i].fd = 0;
   }
 }

@@ -91,6 +91,7 @@ void init()
   lapicinit();
   proc_init();
   pci_init();
+  ata_init();
   kbd_init();
   mouse_init();
   timer_init();

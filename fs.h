@@ -23,12 +23,25 @@
 
 struct buf* ata_read(size_t dev, size_t sector)
 {
-  struct buf* u = kalloc(sizeof(struct buf),KERN_MEM);
+  struct buf* u = (struct buf*)kalloc(sizeof(struct buf), KERN_MEM);
   struct atadev* tdev = (dev == 0)? &ata_primary_master : &ata_primary_slave;
   char* x = ata_read_sector(tdev,sector);
   memcpy(u->data,x,512);
   sfree(x);
   return u;
+}
+
+// reads (start - end + 1) / 512 sectors
+void ata_reads(size_t dev, uint8_t* s, size_t start, size_t end)
+{
+  size_t len = end - start + 1, sz = 0;
+  size_t first = start / 512;
+  size_t slen = len / 512;
+  struct atadev* tdev = (dev == 0)? &ata_primary_master : &ata_primary_slave;
+  for(sz = 0;sz < slen;sz++) {
+      ata_kread_sector(s, tdev, sz);
+      s += SECTOR_SIZE;
+  }
 }
 
 char *cwdpath;

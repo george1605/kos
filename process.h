@@ -488,7 +488,7 @@ struct environ* envdef() // creates a default environment
 
 void mmap(void* mem, int flags, struct proc p) // maps a memory region to a process
 {
-  if(mem == NULL) return;
+  if(mem == NULL_PTR) return;
   if(mem < KERN_MEM)
     p.stack = _vm(mem); // just temporary
 }
@@ -498,6 +498,29 @@ void praddheap(struct proc* p)
 {
   pagetable* tbl = (pagetable*)p->stack;
   add_to_ptable(tbl, (void*)0x1, p->stack + sizeof(pagetable)); 
+}
+
+void prdelheap(struct proc* p)
+{
+  if(p == NULL_PTR) p = myproc();
+  pagetable* tbl = (pagetable*)p->stack;
+  mem_unmap(tbl);
+}
+
+// looks for a unused cpu and starts the function there
+void schedinit(struct proc* p)
+{
+  size_t cores, threads;
+  int i;
+  cpugetinfo(&cores, &threads);
+  for(i = 0;i < cores;i++) {
+    if(cpus[i].proc == NULL_PTR) {// no proc on cpu 
+        cpus[i].proc = p;
+        break;
+    }
+  }
+  lapic_startup(i, (uint32_t)p->f);
+  p->state = STARTED;
 }
 
 void envinit(struct environ *u)

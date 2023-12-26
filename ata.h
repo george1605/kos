@@ -1,6 +1,7 @@
 #pragma once
 #include "lib.c"
 #include "pci.h"
+#include "dma.h"
 #define ATA_DMA_BOUNDARY 0xffffUL
 #define ATA_DMA_MASK 0xffffffffULL
 #define ATA_SR_BSY 0x80
@@ -109,6 +110,14 @@
 #define ATA_NOTATA 0x13
 #define ATA_POLLERR 0x14
 
+#define MBR_PARTITION_1 0x01BE
+#define MBR_PARTITION_2 0x01CE
+#define MBR_PARTITION_3 0x01DE
+#define MBR_PARTITION_4 0x01EE
+
+#define MBR_BOOTABLE 0x80
+#define MBR_REGULAR 0x00
+static int mbr_partitions[5] = {MBR_PARTITION_1, MBR_PARTITION_2, MBR_PARTITION_3, MBR_PARTITION_4};
 struct prdt
 {
     size_t buffer_phys;
@@ -252,10 +261,8 @@ void ata_write_sector(struct atadev *dev, size_t lba, char *buf)
     }
 }
 
-char *ata_read_sector(struct atadev *dev, size_t lba)
+char *ata_kread_sector(char* buf, struct atadev *dev, size_t lba)
 {
-    char *buf = kalloc(SECTOR_SIZE, KERN_MEM);
-
     outportb(dev->BMR_COMMAND, 0);
     // Set prdt
     outportl(dev->BMR_prdt, (size_t)dev->prdt_phys);
@@ -286,6 +293,14 @@ char *ata_read_sector(struct atadev *dev, size_t lba)
 
     memcpy(buf, dev->mem_buffer, SECTOR_SIZE);
     return buf;
+}
+
+// making code more DRY
+char* ata_read_sector(struct atadev *dev, size_t lba)
+{
+    char* s = (char*)kalloc(SECTOR_SIZE, KERN_MEM);
+    ata_kread_sector(s, dev, lba);
+    return s;
 }
 
 void ata_device_init(struct atadev *dev, int primary)
@@ -392,4 +407,22 @@ void ata_init()
     ata_device_detect(&ata_primary_slave, 1);
     ata_device_detect(&ata_secondary_master, 0);
     ata_device_detect(&ata_secondary_slave, 0);
+}
+
+typedef struct {
+  uint8_t  status;
+  uint8_t  chs_first_sector[3];
+  uint8_t  type;
+  uint8_t  chs_last_sector[3];
+  uint32_t lba_first_sector;
+  uint32_t sector_count;
+} mbr_partition;
+
+void ata_open_disk(uint32_t disk, uint8_t partition, mbr_partition *out) {
+  disk = disk; // future plans
+  uint8_t *raw = (uint8_t*)kalloc(SECTOR_SIZE, KERN_MEM);
+  struct atadev* tdev = (disk == 0)? &ata_primary_master : &ata_primary_slave;
+  ata_kread_sector((char*)raw, tdev, 0x0);
+  *out = *(mbr_partition*)(&raw[mbr_partitions[partition]]);
+  free(raw);
 }
