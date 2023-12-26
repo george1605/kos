@@ -1,6 +1,7 @@
 #pragma once
 #include "process.h"
 #include "vfs.h"
+#define NPIPES 16
 
 void pipesend(int from,int to){ 
   struct buf* b = TALLOC(struct buf);
@@ -48,10 +49,56 @@ void shbread(struct shbuf x,int fd){
   free(k);
 }
 
+struct kpipe
+{
+  struct circbuf buf;
+  struct proc* procs[2];
+  int fds[2];
+} pipes[NPIPES];
+
+int pipesetup()
+{
+  for(int i = 0;i < NPIPES;i++) {
+    if(pipes[i].fds[0] == 0) {
+      pipes[i].fds[0] = fdalloc();
+      pipes[i].fds[1] = fdalloc();
+      return i;
+    }
+  }
+  return -1;
+}
+
+void sethead(struct proc* p, struct circbuf cbuf);
+void settail(struct proc* p, struct circbuf cbuf);
+
+void pipeattach(int pipeno, struct proc* p1, struct proc* p2)
+{
+  pipes[pipeno].procs[0] = p1;
+  pipes[pipeno].procs[1] = p2;
+  sethead(p1, pipes[pipeno].buf); // sets the head and tail
+  settail(p2, pipes[pipeno].buf);
+}
+
+void pipewrite(int pipeno, char* buf, size_t size)
+{
+  if(pipes[pipeno].procs[1]->pid == 0)
+    pipes[pipeno].procs[1] = myproc();
+  for(int i = 0;i < size;i++)
+    pushcbuf(&pipes[pipeno].buf, buf[i]);
+}
+
+void pipewrite(int pipeno, char* buf, size_t size)
+{
+  if(pipes[pipeno].procs[0]->pid == 0)
+    pipes[pipeno].procs[0] = myproc();
+  for(int i = 0;i < size;i++)
+    buf[i] = popcbuf(&pipes[pipeno].buf, i);
+}
+
 void prhandle(struct procmsg u){ // the default process message handler 
   switch(u.type){
     case 0x20:
-      prkill(u.to);
+      prkill(&u.to);
     break;
     case 0xF:
       prcpy(u.from, u.to);

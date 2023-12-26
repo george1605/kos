@@ -204,57 +204,6 @@ typedef struct {
     pagetblentry_t entries[1024];
 } pagetable;
 
-typedef struct {
-  void* ptr;
-  size_t size;
-  int free;
-} arenablk;
-
-typedef struct {
-  arenablk* blocks;
-  int num_blocks;
-} arena;
-
-void* arena_alloc(arena* ar, size_t size, void*(*def_alloc)(size_t))
-{
-  for(int i = 0;i < ar->num_blocks;i++)
-    if(ar->blocks[i].free == 0 && ar->blocks[i].size == size)
-      return ar->blocks[i].ptr;
-  
-  return def_alloc(size);
-}
-
-void* arena_realloc(arena* ar, void* p, size_t size, void(*def_alloc)(size_t))
-{
-  for(int i = 0;i < ar->num_blocks;i++)
-    if(ar->blocks[i].ptr == p)
-
-  return def_alloc(size);
-}
-
-// blocks of size 1,2,4,8..2^n
-arena* arena_setup(size_t numblks)
-{
-  arena* ar = (arena*)kalloc(sizeof(numblks), KERN_MEM);
-  ar->blocks = kalloc(sizeof(*ar->blocks), KERN_MEM);
-  int p = 1;
-  for(int i = 0;i < numblks;i++)
-  {
-    ar->blocks[i].free = 1;
-    ar->blocks[i].size = p;
-    ar->blocks[i].ptr = vmap(NULL_PTR, p, PAGE_USER | PAGE_WRITABLE, (struct vfile*)NULL_PTR);
-    p *= 2;
-  }
-  ar->num_blocks = numblks;
-  return ar;
-}
-
-// Allocates a chunk from the arena or gets a kernel
-arena* arena_kalloc(size_t numblks)
-{
-
-}
-
 void *getptr(struct farptr u)
 {
   void *ptr = (void *)(u.base * 0x10 + u.off);
@@ -439,6 +388,108 @@ void mem_unmap(pagetable* table)
   }
   tlb_flush((size_t)table);
   STI();
+}
+
+typedef struct {
+  void* ptr;
+  size_t size;
+  int free;
+  char multi; // if multiblocks are used: 0 0 (1 1 1 1) <-- 4 blocks
+} arenablk;
+
+typedef struct {
+  arenablk* blocks;
+  int num_blocks;
+  pagetable* tbl;
+} arena;
+
+void* arena_alloc(arena* ar, size_t size, void*(*def_alloc)(size_t))
+{
+  for(int i = 0;i < ar->num_blocks;i++) {
+    if(ar->blocks[i].free == 0 && ar->blocks[i].size == size) {
+      ar->blocks[i].multi = 1;
+      return ar->blocks[i].ptr;
+    }
+  }
+  
+  return def_alloc(size);
+}
+
+// finds th first block and tries to merge it with next blocks
+// if it can't then it uses def_alloc(size);
+void* arena_realloc(arena* ar, void* p, size_t size, void*(*def_realloc)(void*, size_t))
+{
+  int start = 0, sz = 0;
+  for(int i = 0;i < ar->num_blocks;i++)
+    if(abs((size_t)ar->blocks[i].ptr - (size_t)p) < ar->blocks[i].size)
+        start = i, sz = ar->blocks[i].size;
+  while(sz < size)
+  {
+    sz += ar->blocks[start].size;
+    ar->blocks[start++].free = 1;
+    ar->blocks[start].multi = 1;
+  }
+  if(abs(sz - size) > size)
+    return p;
+  return def_realloc(p, size);
+}
+
+void arena_free(arena* ar, void* p)
+{
+  int start = 0;
+  for(int i = 0;i < ar->num_blocks;i++)
+    if(abs((size_t)ar->blocks[i].ptr - (size_t)p) < ar->blocks[i].size)
+        start = i;
+  while(ar->blocks[start].multi == 1)
+  {
+    ar->blocks[start++].free = 0;
+  }
+}
+
+// blocks of size 1,2,4,8..2^n
+arena* arena_setup(pagetable* tbl, size_t numblks)
+{
+  arena* ar = (arena*)kalloc(sizeof(arena), KERN_MEM);
+  ar->blocks = (arenablk*)kalloc(sizeof(arenablk) * numblks, KERN_MEM);
+  int p = 1;
+  for(int i = 0;i < numblks;i++)
+  {
+    ar->blocks[i].free = 1;
+    ar->blocks[i].size = p;
+    ar->blocks[i].multi = 0;
+    ar->blocks[i].ptr = vmap(NULL_PTR, p, PAGE_USER | PAGE_WRITABLE, (struct vfile*)NULL_PTR);
+    p *= 2;
+  }
+  ar->num_blocks = numblks;
+  return ar;
+}
+
+// Allocates a chunk from the arena or gets a kernel
+arena* arena_setup2(size_t numblks)
+{
+  arena* ar = (arena*)kalloc(sizeof(arena), KERN_MEM);
+  ar->blocks = (arenablk*)kalloc(sizeof(*ar->blocks) * numblks, KERN_MEM);
+  uint64_t size = fastpow(2, numblks);
+  void* bigblk = vmap(NULL_PTR, size, PAGE_PRESENT | PAGE_WRITABLE, (struct vfile*)NULL_PTR);
+  void* p = bigblk;
+  for(int i = 0;i < numblks;i++) 
+  {
+    ar->blocks[i].free = 0;
+    ar->blocks[i].multi = 0;
+    ar->blocks[i].ptr = p;
+    ar->blocks[i].size = size / 2;
+    p += size / 2;
+    size /= 2;
+  }
+  return ar;
+}
+
+// unmap page table, free the blocks and arena as a whole
+void arena_delete(arena* ar)
+{
+  mem_unmap(ar->tbl);
+  free(ar->blocks);
+  free(ar);
 }
 
 void *ioremap(void* x, size_t len)

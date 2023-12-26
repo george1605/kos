@@ -86,15 +86,27 @@ void prappend(struct proc u)
   release(&prlist.lock);
 }
 
+int fdremap(int fd, struct file* ofiles)
+{
+  int f = fd % (MAX_FDS - 2) + 2; // <-- may replace with another hash function
+  if(ofiles[f].fd == 0)
+    return f;
+  for(int i = 0;i < MAX_FDS;i++)
+    if(ofiles[i].fd == 0)
+      return i;
+  return -1; // -1 elsewhere
+}
+
 void sched()
 {
-  struct proc p = prlist.procs[prlist.front];
+  int ffront = prlist.front;
+  struct proc p = prlist.procs[ffront];
   prlist.front = (prlist.front + 1) % prlist.cnt;
   prlist.size--;
-  prswap(p);
+  prswap(&prlist.procs[ffront]);
   delay(5000); // <-- this corresponds to the time frame for each process
-  prswap(tproc);
-  if(p.state != KILLED)
+  prswap(&tproc);
+  if(prlist.procs[ffront].state != KILLED)
   {
     prlist.rear = (prlist.rear + 1) % prlist.cnt;
     prlist.procs[prlist.rear] = p;
@@ -106,7 +118,7 @@ struct proc prnew_k(char* name, int memSize)
 {
   struct proc p;
   p.name = name;
-  p.stack = (char*)vmap(NULL_PTR, memSize, 0, (vfile*)NULL_PTR);
+  p.stack = (char*)vmap(NULL_PTR, memSize, 0, (struct vfile*)NULL_PTR);
   p.ssize = memSize;
   p.pid = ++lpid;
   p.parent = &tproc;
@@ -209,6 +221,33 @@ struct proc* myproc(void)
   return p;
 }
 
+void prfclose(struct proc* p, int fd)
+{
+  if(p == NULL_PTR)
+    p = myproc();
+
+  if(fd > MAX_FDS) 
+    fd = fdremap(fd, p->ofiles);
+  memset(&(p->ofiles[fd]), 0, sizeof(struct file)); // clears the entry
+}
+
+int prfopen(struct proc* p, char* fname, int perms)
+{
+  if(p == NULL_PTR)
+    p = myproc();
+  struct file f = findfile(fname);
+  f.flags &= perms;
+  f.open = 1; // marks it open
+  int fd = fdremap(f.fd, p->ofiles);
+  p->ofiles[fd] = f;
+  return fd;
+}
+
+void prfwrite(struct proc* p, int fd, char* data, size_t sz)
+{
+  struct file f = p->ofiles[fd];
+  if(!f.open) return;
+}
 // create a process with the same name, link with the parent proc + copy the mem
 struct proc prfork()
 {

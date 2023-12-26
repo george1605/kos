@@ -142,6 +142,11 @@ void mpinit(){
       break;
     }
   }
-  outb(0x22, 0x70);   // Select IMCR
-  outb(0x23, inb(0x23) | 1);
+  if(!ismp)
+    perror("Could not find a suitable machine.");
+
+  if(mp->imcrp){
+    outb(0x22, 0x70);   // Select IMCR
+    outb(0x23, inb(0x23) | 1);
+  }
 }

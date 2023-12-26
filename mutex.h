@@ -92,8 +92,8 @@ void mutex_lock(struct mutex u){
 void thexit(){
   cthread.state = KILLED;
   int c = 0;
-  while(cthread.ofiles[c])
-    fclose(cthread.ofiles[c]), c++;
+  while(cthread.ofiles[c].open == 1)
+    fclose(&cthread.ofiles[c]), c++;
     
 }
 

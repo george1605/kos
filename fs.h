@@ -340,38 +340,6 @@ struct dentry dennew(char *dname, int dev)
   return u;
 }
 
-struct devsw
-{
-  int (*read)(struct inode *, char *, int);
-  int (*write)(struct inode *, char *, int);
-};
-
-struct devsw devsw[8];
-#define CONSOLE 1
-
-void consolewr(struct inode *ind, char *buf, int ssize)
-{
-  if (devsw[CONSOLE].write == 0)
-  {
-    // TO DO
-  }
-  else
-  {
-    devsw[CONSOLE].write(ind, buf, ssize);
-  }
-}
-
-void consolerd(struct inode *ind, char *buf, int ssize)
-{
-  if (devsw[CONSOLE].read == 0)
-  {
-    // TO DO
-  }
-  else
-  {
-    devsw[CONSOLE].read(ind, buf, ssize);
-  }
-}
 
 struct logheader
 {
@@ -426,7 +394,7 @@ void waitlog(struct log u)
 {
   if (u.lock.locked)
   {
-    prswap(tproc);
+    prswap(&tproc);
   }
 }
 
@@ -672,9 +640,6 @@ int _getfd(void* data, int type){
     fd = *(int*)data + 0x1C0000;
     return fd;
   }
-  if(type == CONSOLE){
-    return (*(int*)data) % 2;
-  }
   return fd;
 }
 
@@ -915,6 +880,9 @@ void bzero(int dev, int bno)
   brelse(bp);
 }
 
+struct vfile;
+extern void vfsread(struct vfile vf, char* buf, size_t size);
+
 int readi(struct inode *ip, char *dst, size_t off, size_t n)
 {
   size_t tot, m;
@@ -922,9 +890,12 @@ int readi(struct inode *ip, char *dst, size_t off, size_t n)
 
   if (ip->type == F_DEV)
   {
-    if (ip->major < 0 || ip->major >= NDEV || !devsw[ip->major].read)
-      return -1;
-    return devsw[ip->major].read(ip, dst, n);
+    struct vfile vf;
+    vf.drno = ip->dev;
+    vf.status = ip->flags;
+    vf.fd = ip->inum;
+    vfsread(vf, dst, n);
+    return 0;
   }
 
   if (off > ip->size || off + n < off)
@@ -942,10 +913,10 @@ int readi(struct inode *ip, char *dst, size_t off, size_t n)
   return n;
 }
 
-void fclose(struct file f)
+void fclose(struct file* f)
 {
-  (&f)->open = 0;
-  (&f)->parent = NULL_PTR;
+  f->open = 0;
+  f->parent = NULL_PTR;
   idewait(0);
 }
 

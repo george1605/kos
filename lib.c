@@ -128,6 +128,19 @@ uint8_t sum(uint8_t *addr, int len)
   return sum;
 }
 
+uint64_t fastpow(uint64_t base, uint64_t exp)
+{
+  if(exp == 0)
+    return 1ULL;
+  if(exp % 2 == 0) {
+    uint64_t hlf = fastpow(base, exp/2);
+    return hlf * hlf;
+  } else {
+    uint64_t hlf = fastpow(base, exp/2);
+    return base * hlf * hlf;
+  }
+}
+
 size_t strlen(char *u)
 {
   int i = 0;

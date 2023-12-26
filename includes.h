@@ -9,6 +9,7 @@
 #include "disk.h"
 #include "mem.h"
 #include "tty.c"
+#include "mp.h"
 #include "desktop.h"
 #include "kb.c"
 #include "mouse.h"
@@ -89,6 +90,7 @@ void init()
   sse_init();
   ioapic_init(); // init these, would need for multiproc.
   lapicinit();
+  mpinit(); // SMP
   proc_init();
   pci_init();
   ata_init();

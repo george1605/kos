@@ -14,6 +14,7 @@
 #define STDOUT 1
 #define STDERR 2
 #define DRVSTR 3 /* driver log */
+
 struct vfile
 {
   struct vfile *parent;
@@ -24,12 +25,31 @@ struct vfile
   size_t size; // memory size
   int refcnt; // for link and unlink
   int status;
+  void* ops;
 } vroot;
+
+struct vfileops
+{
+  void (*write)(struct vfile* a, char *data);
+  struct vfile* (*open)(char *a, int mode);
+  void (*close)(struct vfile* a);
+  void (*copy)(struct vfile* a, char *location);
+};
+
+void vfsclose(struct vfile* vf)
+{
+  struct vfileops* fops = (struct vfileops*)vf->ops;
+  if(fops->close != NULL_PTR)
+    fops->close(vf);
+  else {
+    vf->status = ~F_VIRT;
+  }
+}
 
 // parses the path and creates the "tree"
 void vfsparse(struct vfile* head, char* path)
 {
-  int i = 0;
+  int i = sizeof(struct vfile);
   struct vfile* vf = head;
   for(;path[i] != '\0';i++)
   {
@@ -39,6 +59,9 @@ void vfsparse(struct vfile* head, char* path)
     }
   }
 }
+
+struct vfile sysvf[16];
+struct vfile systty[16];
 
 struct vfile* vfslink(struct vfile* vf, char* path)
 {
@@ -60,19 +83,10 @@ void vfslink2(struct vfile* vfpar, struct vfile* vfchld)
 
 int fdalloc()
 {
-  // TO DO: create a fd allocator
-  return 0xFF;
-}
-
-int fdremap(int fd, struct file* ofiles)
-{
-  int f = fd % (MAX_FDS - 2) + 2; // <-- may replace with another hash function
-  if(ofiles[f].fd == 0)
-    return f;
-  for(int i = 0;i < MAX_FDS;i++)
-    if(ofiles[i].fd == 0)
+  for(int i = 0;i < 16;i++)
+    if(sysvf[i].name == NULL_PTR)
       return i;
-  return -1; // -1 elsewhere
+  return -1;
 }
 
 void vfsunlink(struct vfile* chvf)
@@ -93,7 +107,7 @@ struct kmap getmap(struct vfile u)
   struct kmap i;
   i.physs = u.mem;
   i.physe = u.mem + u.size;
-  i.virt = (i.phys >> 8) + KERN_MEM;
+  i.virt = (i.physs >> 8) + KERN_MEM;
   if (u.mem < 0xA0000)
     i.perm = M_USED | M_STATIC;
 
@@ -126,9 +140,6 @@ struct vinode vicreat(int fd, int flags)
     k.dev = fd - 0x1C0000; // device
   return k;
 }
-
-struct vfile sysvf[16];
-struct vfile systty[16];
 
 struct stream
 {
@@ -322,11 +333,6 @@ struct vfile vfsopen(char *name)
   struct vfile v;
   v.name = name;
   return v;
-}
-
-void vfsclose(struct vfile vf)
-{
-  // TO DO!
 }
 
 struct buf* vfsread_k(struct vfile vf)
