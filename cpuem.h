@@ -3,9 +3,11 @@
 #define ERR_INTRON 0x3A
 #define ERR_UNKNOWNAPIC 0x3B
 #define CPU_ID 0x1
-#define CPU_NUM 0x2 // get cpu number
+#define CPU_STRUCT 0x2 // get cpu structure
 #define CPU_PROC 0x3
+#define CPU_SETUP 0x4
 #include "lib.c"
+#include "ioapic.h"
 
 #define cpuid(level, a, b, c, d)                        \
   asm ("cpuid\n\t"                                        \
@@ -30,11 +32,14 @@ void cpuctl(int id, int req, int *params)
      if(params == 0) return;
      cpuid(params[0], params[1], params[2], params[3], params[4]);
     break;
-    case CPU_NUM:
+    case CPU_STRUCT:
      *(struct cpu**)params = mycpu();
     break;
     case CPU_PROC:
      *(struct proc**)params = myproc();
+    case CPU_SETUP:
+     uint32_t addr = *(uint32_t*)params;
+     lapic_startup(id, addr);
     default:
      raise(-1);
     break;

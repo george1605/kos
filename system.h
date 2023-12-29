@@ -8,6 +8,7 @@
 #include "vfs.h"
 #include "user.h"
 #include "pci.h"
+#include "acpi.h"
 #define __SYSCALL static inline 
 #define SYSCALL_EXIT 1
 #define SYSCALL_READ 2
@@ -21,17 +22,6 @@
 #define SYSRES 0xC0DEBA5E /* system reserved space */
 int usermode = 0;
 int sysmode = 1;
-
-int *SMI_CMD;
-char ACPI_ENABLE;
-char ACPI_DISABLE;
-int *PM1a_CNT;
-int *PM1b_CNT;
-short SLP_TYPa;
-short SLP_TYPb;
-short SLP_EN;
-short SCI_EN;
-char PM1_CNT_LEN;
 
 #if _POSIX >= 2
 #define POSIX_ARG_MAX 4096
@@ -52,6 +42,11 @@ char PM1_CNT_LEN;
 #define POSIX_PIPEX_BUF 4096
 #endif
 
+void stacktrace()
+{
+  // TO DO!
+}
+
 struct eptr
 {
   void *ebp;
@@ -67,7 +62,7 @@ __SYSCALL int sys_int(void *arg1)
 
 __SYSCALL void sys_sleep()
 {
-  outw(PM1a_CNT, SLP_TYPa | SLP_EN);
+  acpi_shutdown();
 }
 
 __SYSCALL struct rtcdate * sys_time()
@@ -87,6 +82,14 @@ __SYSCALL void sys_exec(void *arg1, void *arg2)
   {
     prexec(0, (char **)arg2);
   }
+}
+
+__SYSCALL void sys_fabort()
+{
+  CLI();
+  stacktrace(); // prints a stack trace
+  while(1)
+    HALT();
 }
 
 __SYSCALL int sys_open(void *arg1, void *arg2)
@@ -121,7 +124,7 @@ __SYSCALL void sys_fclose(void* arg1)
 {
   struct vfile vf;
   vf.fd = (int)arg1;
-  vfsclose(vf);
+  vfsclose(&vf);
 }
 
 __SYSCALL void sys_write(void *arg1, void *arg2)
@@ -260,88 +263,7 @@ void sys_poll()
 {
 }
 
-struct rsdp_desc
-{
-  char sign[8];
-  uint8_t checksum;
-  char OEMID[6];
-  uint8_t revision;
-  uint32_t raddr;
-} __attribute__((packed));
 
-const char *rsdp_sign = "RSD PTR ";
-
-struct rsdp_desc* rsdp_find()
-{
-  int a;
-  for (a = 0x01; a < 0x7BFF; a += 16)
-    if (strcmp(rsdp_sign, (char*)a) == 0)
-      return (struct rsdp_desc *)a;
-
-  for (a = 0xE0000; a < 0xFFFFF; a += 16)
-    if(strcmp(rsdp_sign,a) == 0)
-      return (struct rsdp_desc *)a;
-
-  return (struct rsdp_desc*)NULL_PTR;
-}
-
-int acpi_enable(void)
-{
-  if ((inw((unsigned int)PM1a_CNT) & SCI_EN) == 0)
-  {
-    // check if acpi can be enabled
-    if (SMI_CMD != 0 && ACPI_ENABLE != 0)
-    {
-      outb((unsigned int)SMI_CMD, ACPI_ENABLE); 
-      int i;
-      for (i = 0; i < 300; i++)
-      {
-        if ((inw((unsigned int)PM1a_CNT) & SCI_EN) == 1)
-          break;
-        delay(10);
-      }
-      if ((int)PM1b_CNT != 0)
-        for (; i < 300; i++)
-        {
-          if ((inw((unsigned int)PM1b_CNT) & SCI_EN) == 1)
-            break;
-          delay(10);
-        }
-      if (i < 300)
-      {
-        return 0;
-      }
-      else
-      {
-        return -1;
-      }
-    }
-    else
-    {
-      return -1;
-    }
-  }
-  else
-  {
-    return 0;
-  }
-}
-
-void acpi_shutdown(void)
-{
-  if (SCI_EN == 0)
-    return;
-
-  acpi_enable();
-  outw((unsigned int)PM1a_CNT, SLP_TYPa | SLP_EN);
-  if (PM1b_CNT != 0)
-    outw((unsigned int)PM1b_CNT, SLP_TYPb | SLP_EN);
-}
-
-void acpi_init(void)
-{
-  acpi_enable();
-}
 
 struct pres
 {
@@ -451,7 +373,7 @@ void __SYSCALL sys_fcall(uint64_t addr, void* _regs)
 void __SYSCALL sys_resmem(void *mem, size_t size)
 {
   struct rmentry i;
-  int *ptr = mem;
+  int *ptr = (int*)mem;
   if ((int)ptr > 1 && rmtable.n < 16)
   {
     *(ptr - 1) = SYSRES;

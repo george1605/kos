@@ -60,6 +60,7 @@ int pipesetup()
 {
   for(int i = 0;i < NPIPES;i++) {
     if(pipes[i].fds[0] == 0) {
+      memset(pipes[i].procs, 0, 2 * sizeof(struct proc*));
       pipes[i].fds[0] = fdalloc();
       pipes[i].fds[1] = fdalloc();
       return i;
@@ -68,31 +69,55 @@ int pipesetup()
   return -1;
 }
 
-void sethead(struct proc* p, struct circbuf cbuf);
-void settail(struct proc* p, struct circbuf cbuf);
+void sethead(struct proc* p, int fd, struct circbuf cbuf)
+{
+  p->ofiles[fd].flags = F_PIPE & F_READ;
+}
+
+void settail(struct proc* p, int fd, struct circbuf cbuf)
+{
+  p->ofiles[fd].flags = F_PIPE & F_WRITE;
+}
 
 void pipeattach(int pipeno, struct proc* p1, struct proc* p2)
 {
   pipes[pipeno].procs[0] = p1;
   pipes[pipeno].procs[1] = p2;
-  sethead(p1, pipes[pipeno].buf); // sets the head and tail
-  settail(p2, pipes[pipeno].buf);
+  sethead(p1, pipes[pipeno].fds[0], pipes[pipeno].buf); // sets the head and tail
+  settail(p2, pipes[pipeno].fds[1], pipes[pipeno].buf);
 }
 
 void pipewrite(int pipeno, char* buf, size_t size)
 {
-  if(pipes[pipeno].procs[1]->pid == 0)
+  if(pipes[pipeno].procs[1] == NULL_PTR)
     pipes[pipeno].procs[1] = myproc();
   for(int i = 0;i < size;i++)
     pushcbuf(&pipes[pipeno].buf, buf[i]);
+  signal(SIG_WRITEPIPE, pipes[pipeno].procs[0], pipes[pipeno].fds[1], buf);
 }
 
-void pipewrite(int pipeno, char* buf, size_t size)
+void piperead(int pipeno, char* buf, size_t size)
 {
-  if(pipes[pipeno].procs[0]->pid == 0)
+  if(pipes[pipeno].procs[0] == NULL_PTR)
     pipes[pipeno].procs[0] = myproc();
   for(int i = 0;i < size;i++)
-    buf[i] = popcbuf(&pipes[pipeno].buf, i);
+    buf[i] = readcbuf(&pipes[pipeno].buf, i);
+}
+
+void pipeclose(int pipeno)
+{
+  struct proc* p1 = pipes[pipeno].procs[0], *p2 = pipes[pipeno].procs[1];
+  int fd1 = pipes[pipeno].fds[0], fd2 = pipes[pipeno].fds[1];
+
+  memset(&(p1->ofiles[fd1]), 0, sizeof(struct file)); // clear the entries  
+  memset(&(p2->ofiles[fd2]), 0, sizeof(struct file));  
+
+}
+
+void pipestd(struct proc* p1, struct proc* p2)
+{
+  vfslink2(&(p1->std[0]), &(p2->std[1]));
+  vfslink2(&(p1->std[1]), &(p2->std[0]));
 }
 
 void prhandle(struct procmsg u){ // the default process message handler 

@@ -62,7 +62,7 @@ void fixdate(struct rtcdate *r) {
 
 void rwait(int seconds) {
 	size_t secs = cmos_read(SECS);
-	size_t current = cmos_read(SECS);
+	size_t current = secs;
 	while (current - secs < seconds) {
 	   current = cmos_read(SECS);
 	   delay(10000);

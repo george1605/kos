@@ -152,10 +152,7 @@ void _fread(void* buf, int size, int cnt, FILE* ptr)
     ptr->_flags = B_NONE;
     return;
   }
-  struct vfile vf;
-  vf.fd = ptr->_fd;
-  vf.mem = NULL;
-  vfsread(vf, (char*)buf, bytes);
+  
 }
 
 FILE *freopen(const char *filename, const char *mode, FILE *stream)
@@ -166,7 +163,7 @@ FILE *freopen(const char *filename, const char *mode, FILE *stream)
 
 int fileno(FILE* f)
 {
-  if(f == NULL_PTR)
+  if(f == NULL)
     return -1;
   
   return f->_fd;

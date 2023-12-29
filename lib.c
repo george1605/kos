@@ -40,6 +40,13 @@ void *getframe()
   return frame;
 }
 
+uint32_t geteip() {
+  uint32_t esp, eip;
+  asm volatile ("mov %%esp, %0" : "=r"(esp));
+  eip = *(uint32_t*)esp;
+  return eip;
+}
+
 int invmod(int A, int B, int X) // ( A / B ) % X
 {
   return ((B % X) / (A % X)) % X;
@@ -742,6 +749,12 @@ static inline size_t readeflags()
   asm volatile("pushfl; popl %0"
                : "=r"(eflags));
   return eflags;
+}
+
+int checkintr()
+{
+  size_t flags = readeflags();
+  return flags & (1 << 9);
 }
 
 static inline void pusheflags(size_t flags)

@@ -9,6 +9,7 @@
 #define F_RDWR 8
 #define F_DIR 32
 #define F_DEV 64 /* device file */
+#define F_PIPE 128
 #define F_EXEC 0xFF
 #define F_VIRT 0x100 /* generic vfile - may be F_DEV (or not) */
 #define NDEV 16
@@ -79,6 +80,7 @@ struct file
   int fd;
   int flags;
   char open;
+  void* extra;
 } root;
 
 struct ftable {

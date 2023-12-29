@@ -16,6 +16,7 @@
 #define F_DEV 64 /* device file */
 #define F_EXEC 0xFF
 #define F_VIRT 0x100
+#define B_NONE 0x20
 
 void* userm_malloc(size_t size)
 {

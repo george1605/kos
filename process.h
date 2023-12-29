@@ -114,7 +114,7 @@ void sched()
   }
 }
 
-struct proc prnew_k(char* name, int memSize)
+struct proc* prnew_k(char* name, int memSize)
 {
   struct proc p;
   p.name = name;
@@ -122,10 +122,10 @@ struct proc prnew_k(char* name, int memSize)
   p.ssize = memSize;
   p.pid = ++lpid;
   p.parent = &tproc;
+  prappend(p);
   sched();
-  return p;
+  return &prlist.procs[prlist.cnt];
 }
-
 
 struct sleeplock
 {
@@ -249,13 +249,53 @@ void prfwrite(struct proc* p, int fd, char* data, size_t sz)
   if(!f.open) return;
 }
 // create a process with the same name, link with the parent proc + copy the mem
-struct proc prfork()
+struct proc* prfork()
 {
   struct proc* parent = myproc();
-  struct proc p = prnew_k(parent->name, parent->ssize);
-  p.parent = parent;
-  memcpy(p.stack, parent->stack, parent->ssize);
+  struct proc* p = prnew_k(parent->name, parent->ssize);
+  p->parent = parent;
+  p->state = ZOMBIE;
+  memcpy(p->stack, parent->stack, parent->ssize);
   return p;
+}
+
+void waitpid(int pid, int* state)
+{
+  struct proc p = procid(pid);
+  if(p.parent == myproc())
+  {
+    p.state = STARTED;
+  }
+  if(state)
+    *state = p.ret;
+}
+
+void waitproc(struct proc* p, int* state)
+{
+  if(p->parent == myproc())
+  {
+    p->state = STARTED;
+  }
+  if(state)
+    *state = p.ret; 
+}
+
+int findchild(int pid, struct proc** procs)
+{
+  int k = 0;
+  for(int i = 0;i < prlist.cnt;i++)
+    if(prlist.procs[i].parent->pid == pid)
+      procs[k++] = &prlist.procs[i];
+  return k;
+}
+
+void wait()
+{
+  struct proc* cntp = myproc();
+  struct proc** procs = kalloc(sizeof(struct proc*) * 5);
+  int num = findchild(cntp->pid, procs);
+  for(int i = 0;i < num;i++)
+    waitproc(procs[i], (int*)NULL_PTR);
 }
 
 // returns the process currently running
@@ -421,6 +461,14 @@ struct exithnd
   int num_funcs;
 };
 
+void addexit(struct proc* p, void(*func)())
+{
+  struct exithnd* exit = (struct exithnd*)(p->stack + p->ssize - sizeof(struct exithnd));
+  if(exit->num_funcs == MAX_EXITFUNCS)
+    return;
+  exit->f[exit->num_funcs++] = func;
+}
+
 void kprexit(struct proc* p, int code)
 {
   struct exithnd* exit = (struct exithnd*)(p->stack + p->ssize - sizeof(struct exithnd));
@@ -429,7 +477,7 @@ void kprexit(struct proc* p, int code)
   p->ret = code;
   for(int i = 0;i < MAX_FDS;i++)
     if(p->ofiles[i].fd != -1)
-      fclose(p->ofiles[i]); // close the files
+      fclose(&p->ofiles[i]); // close the files
   prkill(p); // kill the current proc
 }
 
@@ -442,7 +490,8 @@ void klogproc(struct proc* p)
 void prend(struct proc u, int status)
 {
   prkill(&u);
-  kprint("Process ended with status: ");
+  u.ret = status;
+  klogproc(&u);
 }
 
 void prexec(int argv, char **argc)
@@ -666,3 +715,22 @@ struct atomic
   struct spinlock alock; // lock for writing
   long value;
 };
+
+#define SIG_WRITEPIPE 0x10
+#define SIG_KILL 0x20
+
+void signal(int type, void* arg, void* arg2, void* arg3)
+{
+  switch(type)
+  {
+  case SIG_WRITEPIPE:
+    if(arg == NULL_PTR || arg2 == NULL_PTR || arg3 == NULL_PTR) return;
+    struct circbuf* buf = ((struct proc*)arg)->ofiles[(int)arg2].extra;
+    
+  break;
+  case SIG_KILL:
+    kprexit((struct proc*)arg, 0);
+  default:
+    return;
+  }
+}
