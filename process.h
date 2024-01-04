@@ -352,17 +352,6 @@ struct proc prcreat(char *prname)
   u.name = prname;
 }
 
-struct proc proc_init()
-{
-  struct proc t;
-  t.state = STARTED;
-  t.pid = 1;
-  t.stack = kalloc(100, KERN_MEM);
-  t.f = cons;
-  kproc = t;
-  kproc.f(0, (char **)0);
-}
-
 void proc_exit()
 {
   HALT();
@@ -585,14 +574,15 @@ void mmap(void* mem, int flags, struct proc p) // maps a memory region to a proc
 void praddheap(struct proc* p)
 {
   pagetable* tbl = (pagetable*)p->stack;
-  add_to_ptable(tbl, (void*)0x1, p->stack + sizeof(pagetable)); 
+  arena* ar = arena_setup(tbl, 12); // up to a page
+  *(arena**)(p->stack + sizeof(pagetable)) = ar;
 }
 
 void prdelheap(struct proc* p)
 {
   if(p == NULL_PTR) p = myproc();
-  pagetable* tbl = (pagetable*)p->stack;
-  mem_unmap(tbl);
+  arena* ar = *(arena**)(p->stack + sizeof(pagetable));
+  arena_delete(ar);
 }
 
 // looks for a unused cpu and starts the function there

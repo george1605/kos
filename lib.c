@@ -725,14 +725,19 @@ void showint(int p)
   }
 }
 
-int rseed = 1;
-
-int rand()
+uint64_t rseed = 0xFEE00000;
+uint32_t rand()
 {
-  int x = 13525625 ^ rseed;
-  int y = 84692457;
-  rseed += (rseed % 10);
-  return (y - x) | (313101 * rseed);
+  rseed ^= (seed << 13);
+  rseed ^= (seed >> 7);
+  rseed ^= (seed << 17);
+  return (uint32_t)rseed;
+}
+
+double randf()
+{
+  uint32_t r = rand();
+  return (double)r / (double)(1 << 30);
 }
 
 struct regs

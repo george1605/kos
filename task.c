@@ -4,14 +4,16 @@
 #define IO_TASK 0x8
 #define NET_TASK 0xF
 #include "process.h"
+typedef struct spinlock semaphore;
 
 struct task {
  int flags;
  int pid;
- int cnt;
  int perm; // permissions
- char* res;
- size_t sems[8]; // sempahores
+ char* stack;
+ size_t size;
+ struct proc* parent;
+ struct file* ofiles;
  int(*f)(void);
 };
 
@@ -128,6 +130,16 @@ struct task task_creat(int ring, long long stack)
   if(ring < 2)
     iopriv();
   return c;
+}
+
+struct task* subproc(struct proc* p, size_t memsz, int flags) // subprocess
+{
+  struct task* t = (struct task*)kalloc(sizeof(struct task), KERN_MEM);
+  t->size = memsz;
+  t->perm = flags;
+  t->stack = arena_alloc(ar, memsz, sys_malloc);
+  if(flags & IO_TASK)
+      t->ofiles = p->ofiles;
 }
 
 void psched()

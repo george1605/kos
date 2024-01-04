@@ -30,7 +30,8 @@ struct vfile
 
 struct vfileops
 {
-  void (*write)(struct vfile* a, char *data);
+  void (*write)(struct vfile* a, char *data, size_t);
+  void (*read)(struct vfile* a, char *data, size_t);
   struct vfile* (*open)(char *a, int mode);
   void (*close)(struct vfile* a);
   void (*copy)(struct vfile* a, char *location);
@@ -98,7 +99,7 @@ void vfsunlink(struct vfile* chvf)
   {
     // TO DO: delete the file
   }
-  chvf->parent = NULL_PTR;
+  chvf->parent = (struct vfile*)NULL_PTR;
   chvf->fd = fdalloc(); // get a different fd
 }
 
@@ -107,14 +108,14 @@ struct kmap getmap(struct vfile u)
   struct kmap i;
   i.physs = u.mem;
   i.physe = u.mem + u.size;
-  i.virt = (i.physs >> 8) + KERN_MEM;
-  if (u.mem < 0xA0000)
+  i.virt = ((uint64_t)i.physs >> 8) + KERN_MEM;
+  if ((uint64_t)u.mem < 0xA0000)
     i.perm = M_USED | M_STATIC;
 
-  if (u.mem > 0x300000)
+  if ((uint64_t)u.mem > 0x300000)
     i.perm = M_READ;
 
-  if (u.mem >= KERN_MEM)
+  if ((uint64_t)u.mem >= KERN_MEM)
     i.perm = M_BOTH;
   return i;
 }
@@ -217,6 +218,28 @@ int isnulldev(char *path)
   return 0;
 }
 
+// /dev/random (gives random numbers)
+void randread(struct vfile* vf, char* bytes, size_t size)
+{
+  int sz = 0;
+  while(size - sz > sizeof(int)) {
+    ((int*)bytes)[sz] = rand();
+    sz += sizeof(int);
+  }
+  while(sz < size)
+    bytes[sz++] = rand() & 0xff; 
+}
+
+void randomdev()
+{
+  int fd = fdalloc();
+  sysvf[fd].name = "/home/dev/rand";
+  sysvf[fd].ops = kalloc(sizeof(struct vfileops), KERN_MEM);
+  struct vfileops* ops = (struct vfileops*)sysvf[fd].ops;
+  ops->write = NULL_PTR; // if the write func is null then cannot write to it(simple)
+  ops->read = randread;
+}
+
 struct vfile vfsata(int dev, char *name)
 {
   struct atadev *u = (dev == 0) ? &ata_primary_master : &ata_secondary_master;
@@ -263,6 +286,7 @@ void vfsinit()
   sysvf[4] = vfsmap("/home/sys/stack.info", _vm(10));
   sysvf[5] = vfsdmap("/home/dev/com1.dev", i);
   atamap();
+  randomdev();
 }
 
 void vfsrem()

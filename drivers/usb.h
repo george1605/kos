@@ -195,7 +195,7 @@ size_t xhci_write(struct vfile* node, size_t offset, size_t size, uint8_t * buff
 	return sizeof(struct xhci_trb);
 }
 
-void find_xhci(uint32_t device, uint16_t v, uint16_t d, void * extra)
+uint64_t find_xhci(uint32_t device, uint16_t v, uint16_t d, void * extra)
 {
   if (pci_find_type(device) != 0x0C03) return;
   struct pcidev _d = {.device = device};
@@ -221,6 +221,8 @@ void find_xhci(uint32_t device, uint16_t v, uint16_t d, void * extra)
 		pci_write_field(device, PCI_BAR1, 4, (mmio_addr >> 32));
 		#endif
 	}
+
+	return mmio_addr;
 }
 
   int xhcinew()

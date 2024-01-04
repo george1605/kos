@@ -26,7 +26,13 @@ struct _fblock
 void mem_init()
 {
   freeblks = (struct _fblock *)0x2FFFF00;
+  fblkcnt = 10;
 }
+
+typedef struct {
+  size_t size;
+  int used;
+} kblockinfo;
 
 void *smalloc(int bytes)
 {
@@ -37,19 +43,33 @@ void *smalloc(int bytes)
   return u;
 }
 
-void *alloc(void *start, int bytes)
+void* findfree(void* start, size_t bytes)
 {
-  int *u = heapbrk;
-  if (start == 0)
-    heapbrk += (bytes + 2);
-  else if (start > heapbrk)
-    heapbrk = (int*)start + bytes + 2;
-  else
-    heapbrk += (bytes + 2);
+  for(int i = 0;i < fblkcnt;i++)
+    if(freeblks[i].ptr >= start && freeblks[i].size - bytes < PAGE_SIZE)
+      return freeblks[i].ptr;
+  return NULL_PTR;
+}
 
-  *(u + 1) = 0xdeadbeef;
-  *(u + bytes) = 0;
-  return (void *)(u + 2);
+void* bumpalloc(void* start, size_t bytes)
+{
+  char* u = (char*)heapbrk;
+  if (start == 0)
+    heapbrk += (bytes + sizeof(kblockinfo));
+  else
+    u = (char*)start;
+  return u;
+}
+
+void *alloc(void *start, size_t bytes)
+{
+  void* p = findfree(start, bytes);
+  if(!p)
+    p = bumpalloc(start, bytes);
+  kblockinfo* info = (kblockinfo*)p;
+  info->used = 1;
+  info->size = bytes;
+  return (void *)((char*)p + sizeof(kblockinfo));
 }
 
 void *kcalloc(int blocks, int bytes)
@@ -100,22 +120,14 @@ void *kalloc(int bytes, int mode)
     return smalloc(bytes);
 }
 
-void free(int *start)
+void free(void *start)
 {
   int u = 0;
-  if (start != 0)
-  {
-    while (*(start + u) != 0 && u <= 99)
-    {
-      *(start + u) = 0;
-      u++;
-    }
-  }
-  struct _fblock i;
-  i.ptr = start;
-  i.size = u;
-  freeblks[++fblkcnt] = i; // adds a free block
-  heapbrk -= (u + 2);
+  if (start == 0)
+    return;
+  kblockinfo* info = (kblockinfo*)(start - sizeof(kblockinfo));
+  info->used = 0;
+  memset(start, 0, info->size);
 }
 
 void freeb(char *start)

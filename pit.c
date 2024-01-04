@@ -69,9 +69,12 @@ void timer_phase(int hz)
     outportb(0x40, divisor >> 8);     /* Set high byte of divisor */
 }
 
+extern void sched();
 void timer_handler(struct regs *r)
 {
     timer_ticks++;
+    if(timer_ticks % 2)
+      sched();
 }
 
 void timer_install()
