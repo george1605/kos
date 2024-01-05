@@ -585,6 +585,19 @@ void prdelheap(struct proc* p)
   arena_delete(ar);
 }
 
+void* prallocheap(struct proc* p, size_t size)
+{
+  arena* ar = *(arena**)(p->stack + sizeof(pagetable));
+  return arena_alloc(ar, size, safe_alloc); // doesn't even use USER MEMORY!!! after all (uses Linked Lsits also)
+}
+
+void prfreeheap(struct proc* p, void* ptr)
+{
+  if(ptr == NULL_PTR) return;
+  arena* ar = *(arena**)(p->stack + sizeof(pagetable));
+  arena_free(ar, p);
+}
+
 // looks for a unused cpu and starts the function there
 void schedinit(struct proc* p)
 {

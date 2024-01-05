@@ -137,9 +137,11 @@ struct task* subproc(struct proc* p, size_t memsz, int flags) // subprocess
   struct task* t = (struct task*)kalloc(sizeof(struct task), KERN_MEM);
   t->size = memsz;
   t->perm = flags;
-  t->stack = arena_alloc(ar, memsz, sys_malloc);
+  t->stack = (char*)prallocheap(p, memsz);
   if(flags & IO_TASK)
       t->ofiles = p->ofiles;
+  t->parent = p;
+  return t;
 }
 
 void psched()

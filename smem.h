@@ -88,7 +88,7 @@ struct MemChunk *memalloc(size_t bytes)
   return u;
 }
 
-void* safe_alloc(size_t size)
+void* safe_alloc_k(void* start, size_t size)
 {
    if(malloc_head == 0)
    {
@@ -99,8 +99,14 @@ void* safe_alloc(size_t size)
    malloc_cnt = malloc_cnt->next;
    malloc_cnt->size = size;
    malloc_cnt->free = 0;
-   malloc_cnt->mem  = kalloc(size, USER_MEM);
+   malloc_cnt->mem  = alloc(start, size);
    return malloc_cnt->mem;
+}
+
+void* safe_alloc(size_t size)
+{
+  void* start = vmap(NULL_PTR, size, PAGE_PRESENT, (struct vfile*)NULL_PTR);
+  return safe_alloc_k(start, size);  
 }
 
 void *dyalloc(size_t off)
@@ -512,4 +518,51 @@ void freeheap(void* heap)
 {
   int size = *(int*)(heap - 1);
   memset(heap, 0, size);
+}
+
+struct list_head {
+	struct list_head *next, *prev;
+};
+
+struct list_elem {
+  struct list_elem *next, *prev;
+  void* data;
+};
+
+void list_init(struct list_head* head)
+{
+  head->next = NULL_PTR;
+  head->prev = NULL_PTR;
+}
+
+void list_add(struct list_head* head, struct list_head* elem)
+{
+  head->next = elem;
+  elem->prev = head;
+}
+
+struct list_head* list_alloc_k(size_t elems)
+{
+  int i;
+  struct list_head* head = kalloc(sizeof(struct list_head), KERN_MEM), *p;
+  p = head;
+  head->prev = NULL_PTR;
+  for(i = 0;i < elems;i++) {
+    list_add(p, kalloc(sizeof(struct list_elem), KERN_MEM));
+    p = p->next;
+  }
+  p->next = NULL_PTR;
+  return head;
+}
+
+void list_free_k(struct list_head* head)
+{
+  assert(head != NULL_PTR);
+  struct list_head* h;
+  while(head->next != NULL_PTR)
+  {
+    h = head->next;
+    free(head->next);
+    head->next = h;
+  }
 }

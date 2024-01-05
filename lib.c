@@ -728,9 +728,9 @@ void showint(int p)
 uint64_t rseed = 0xFEE00000;
 uint32_t rand()
 {
-  rseed ^= (seed << 13);
-  rseed ^= (seed >> 7);
-  rseed ^= (seed << 17);
+  rseed ^= (rseed << 13);
+  rseed ^= (rseed >> 7);
+  rseed ^= (rseed << 17);
   return (uint32_t)rseed;
 }
 

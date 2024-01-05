@@ -4,6 +4,9 @@
 #include "vesa.h"
 #include "vfs.h"
 #include "mem.h"
+#ifdef _USE_MESA_
+#include "./drivers/mesa/main.c"
+#endif
 #define VGA_AC_INDEX      0x3C0
 #define VGA_AC_WRITE      0x3C0
 #define VGA_AC_READ       0x3C1
@@ -40,6 +43,7 @@
 #define PALETTE_READ 0x3C7
 #define PALETTE_WRITE 0x3C8
 #define PALETTE_DATA 0x3C9
+#define NSCREENS 8 // If you hav more than that, goodbye!
 
 static char *VBUFFER = (char*)0xA0000;
 static char *BBUFFER;
@@ -232,6 +236,11 @@ struct vfile* vidvirt(int flags)
          vf.mem = (void*)getfb();
          vf.size = 1920 * 1080 * 4;
       break;
+      #ifdef _USE_MESA_
+      case VID_MESA:
+         // TO DO!
+      break;
+      #endif
       default:
          vf.mem = (void*)0xB8000; // returns the default text mode
          vf.size = 80 * 25 * 2; 
@@ -259,9 +268,31 @@ struct vscreen
 {
    int s_pid; 
    int s_fd; // allocated file descriptor
-   uint16_t s_width, s_height;
+   uint16_t s_width, s_height, s_bpp;
    void* s_mem;
-};
+   struct spinlock s_lock;
+} scrn_list[NSCREENS];
+
+struct vscreen* scrn_req(int id)
+{
+   struct vscreen* s = &scrn_list[id];
+   struct vfile* vf;
+   if(id == 0)
+   {
+      vf = vidvirt(0);
+      s->s_mem = vf->mem;
+   }
+   return NULL_PTR;
+}
+
+void scrn_clear(struct vscreen* s, unsigned long color)
+{
+   acquire(&(s->s_lock));
+   int i;
+   for(i = 0;i < s->s_width * s->s_height;i++)
+      memcpy(s->s_mem, (uint8_t*)&color, s->s_bpp);
+   release(&(s->s_lock));
+}
 
 // for monochrome
 void scrn_wbit(struct vscreen* scrn, size_t p)

@@ -4,6 +4,7 @@
 #include "time.c"
 #include "system.h"
 #include "asmproc.h"
+#define F_API 0x200 // "API" File
 typedef void*(*apifunc)(void*);
 
 apifunc* api_list;
@@ -51,7 +52,8 @@ void api_call(int num, void* args)
   if(num >= 16 || args == 0)
    return;
   iopriv(); // gives iopriv
-  api_list[num](args);
+  api_list[num](args); // jmp _sike _sike: 
+  no_iopl(); // sets iopriv to none
 }
 
 struct sfile
@@ -60,9 +62,17 @@ struct sfile
   struct fileops* ops;
 };
 
-void api_regster(struct fileops ops, char* name)
+void api_regster(struct vfile* vfile, struct vfile*(*init)(char* a, int mode), void(*exit)(struct vfile*))
 {
-  struct sfile f;
-  f.ops = (struct fileops*)TALLOC(struct fileops);
-  *f.ops = ops;
+  struct vfileops* ops = (struct vfileops*)vfile->ops;
+  ops->open = init;
+  ops->close = exit;
+  vfile->status |= F_API;
+}
+
+void api_call_main(struct vfile* vf, int argc, char** argv)
+{
+  assert(argc > 0);
+  assert(vf != NULL_PTR);
+  
 }
