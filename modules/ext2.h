@@ -460,6 +460,38 @@ void ext2_alloc_block(uint32_t *out, ext2_gen_device *dev, ext2_priv_data *priv)
 	 }
 }
 
+int ext2_is_free(uint32_t block, ext2_gen_device* dev, ext2_priv_data* priv)
+{
+	ext2_read_block(block_buf, block, dev, priv);
+	uint32_t i = 0x1a2ed00;
+	return memncmp((char*)block_buf, (char*)&i, 4);
+}
+
+void ext2_extend(ext2_inode* inode, uint32_t size, ext2_gen_device* dev, ext2_priv_data* priv)
+{
+
+}
+
+void ext2_free_block(uint32_t in, ext2_gen_device *dev, ext2_priv_data *priv)
+{
+	ext2_read_block(root_buf, priv->first_bgd, dev, priv);
+	memset(root_buf, 0x1a2ed00, 4); // marks it as empty
+	block_group_desc_t *bg = (block_group_desc_t *)root_buf;
+	for(int i = 0; i < priv->number_of_bgs; i++)
+	 {
+	 	if(bg->num_of_unalloc_block)
+	 	{
+	 		bg->num_of_unalloc_block ++;
+	 		ext2_write_block(root_buf, priv->first_bgd + i, dev, priv);
+			superblock_t *sb = (superblock_t *)root_buf;
+			sb->unallocatedblocks ++;
+			ext2_write_block(root_buf, priv->sb.superblock_id, dev, priv);
+			return;
+	 	}
+	 	bg++;
+	 }
+}
+
 void ext2_alloc_range(int num, uint32_t* start, uint32_t* end, ext2_gen_device* dev, ext2_priv_data* data)
 {
 	ext2_alloc_block(start, dev, data);

@@ -67,7 +67,7 @@ __SYSCALL void sys_sleep()
 
 __SYSCALL struct rtcdate * sys_time()
 {
-  struct rtcdate *u = (struct rtcdate *)0xDDFF00;
+  struct rtcdate *u = (struct rtcdate *)prallocheap(myproc(), sizeof(struct rtcdate));
   filldate(u);
   return u;
 }
@@ -98,9 +98,10 @@ __SYSCALL int sys_open(void *arg1, void *arg2)
   if(fd > -1)
     return fd;
 
-  struct file f = findfile((char*)arg1);
-  f.flags = fperms(f, (int)arg2);    
-  return f.fd; 
+  int fd = _open((char*)arg1, (int)arg2);
+  struct proc* pr = myproc();
+  pr->ofiles[fdremap(fd, pr->ofiles)].flags &= (int)arg2;
+  return fd;
 }
 
 __SYSCALL void sys_mkdir(void *arg1, void *arg2)
@@ -129,16 +130,12 @@ __SYSCALL void sys_fclose(void* arg1)
 
 __SYSCALL void sys_write(void *arg1, void *arg2)
 {
-  struct buf *a = (struct buf *)arg2;
-  a->flags = B_DIRTY;
-  _write(sys_int(arg1), a, 512);
+  _write((int)arg1, (struct buf*)arg2, 0);
 }
 
 __SYSCALL void sys_read(void* arg1, void* arg2)
 {
-  struct buf *a = (struct buf *)arg2;
-  a->flags = B_VALID;
-  _read(sys_int(arg1), a, 512);
+  fsread((char*)arg1, (char*)arg2);
 }
 
 __SYSCALL int sys_fork()
@@ -147,24 +144,21 @@ __SYSCALL int sys_fork()
   return p->pid;
 }
 
-__SYSCALL void sys_rem(int fd)
+__SYSCALL void sys_rem(char* name)
 {
-  if(fd <= 3) // cannot remove stdin/stdout
+  if(!strcmp(name, "/home"))
     return;
-  setfptr(fd, NULL_PTR); // just sets the filepointer to NULL
+  ext2_removefile(name, fs_dev, fs_dev->priv);
 }
 
 __SYSCALL void* sys_malloc(size_t size)
 {
-  return safe_alloc(size);
+  return prallocheap(myproc(), size);
 }
 
 __SYSCALL void sys_free(void* ptr)
 {
-  struct malloc_block* q;
-  for(q = malloc_head;q != 0;q = q->next)
-    if(abs((size_t)ptr - (size_t)q->mem) < q->size) // char* p = malloc(10); p++; free(p); <-- in this case it works
-      q->free = 0;
+  prfreeheap(myproc(), ptr); // ARENA ALLOCATOR!
 }
 
 #define MAX_SYSCALLS 20

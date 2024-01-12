@@ -3,6 +3,7 @@
 #include "lib.c"
 #include "drivers/ioctl.h"
 #include "vfs.h"
+#include "fs.h"
 #define TTYBASE 0xBB00
 #define MAXTTY 17
 #define TTY_ERR 128
@@ -33,7 +34,8 @@ struct ttyport ttyalloc()
 
 struct ttydev
 {
-  struct blkdev *device;
+  void(*getc)(char*);
+  void(*putc)(char);
   int num;
   int flags;
   char *name;
@@ -51,15 +53,6 @@ int ttyinit(size_t num)
   initlock(&u.lock, NULL_PTR);
   ttys[num] = u;
   return 0;
-}
-
-struct vfile ttymap(char *name, size_t num)
-{
-  struct vfile u;
-  u.status = 0xF0;
-  u.fd = TTYBASE + num;
-  u.name = name;
-  return u;
 }
 
 struct ttydev ttyopen_k(size_t num)
@@ -89,6 +82,73 @@ struct ttydev ttyopen(char* name, int flags)
   }
 }
 
+int ttyread(size_t num, char* data)
+{
+  if (num > MAXTTY)
+    return 0;
+  if (ttys[num].lock.locked == 1)
+    return 0;
+
+  while(*data != '\0')
+    ttys[num].getc(data++);
+}
+
+int ttywrite(size_t num, char *dev)
+{
+  if (num > MAXTTY)
+    return -1;
+  if (ttys[num].lock.locked == 1)
+    return -1;
+
+  while(*dev)
+    ttys[num].putc(*dev++);
+  return 0;
+}
+
+void tty_read_ext(char* name, char* buffer, ext2_gen_device* dev, void* priv)
+{
+    if(memncmp(name, "/tty-", 5) != 0)
+      return;
+    name += 4;
+    uint32_t i = 0, j = 0;
+    while(name[i] != '\0')
+    {
+      j = j * 10 + (name[i] - '0');
+      i++;
+    }
+    ttyread(j, buffer);
+}
+
+void tty_write_ext(char* name, char* buffer, size_t len, ext2_gen_device* dev, void* priv)
+{
+    if(memncmp(name, "/tty-", 5) != 0)
+      return;
+    name += 4;
+    uint32_t i = 0, j = 0;
+    while(name[i] != '\0')
+    {
+      j = j * 10 + (name[i] - '0');
+      i++;
+    }
+    ttywrite(j, buffer);
+}
+
+uint8_t tty_exist_ext(char* name, ext2_gen_device* dev, void* priv)
+{
+  if(memncmp(name, "/tty-", 5) != 0)
+      return;
+  name += 4;
+  uint32_t i = 0, j = 0;
+  while(name[i] != '\0')
+  {
+    j = j * 10 + (name[i] - '0');
+    i++;
+  }
+  if(j > MAXTTY)
+    return 0;
+  return 1;
+}
+
 void ttystart()
 {
   if (!irq_isset(4)) // if serial is not connected
@@ -96,8 +156,14 @@ void ttystart()
     serial_install();
     serial_init();
   }
-  ttyinit(0);
-  systty[0] = ttymap("/home/tty/tty0.con", 0);
+  ttys[0].putc = uartputc;
+  ttys[0].getc = uartgetc;
+  filesystem* fs = kalloc(sizeof(filesystem), KERN_MEM);
+  fs->name = "TTY";
+  fs->read = tty_read_ext;
+  fs->writefile = tty_write_ext;
+  fs->exist = tty_exist_ext;
+  mount("/home/dev/tty", fs);
 }
 
 void ttyswap(int x, int y)
@@ -109,36 +175,10 @@ void ttyswap(int x, int y)
   ttys[y] = ttys[x]; 
 }
 
-void ttyset(size_t num, struct blkdev *dev)
-{
-  ttys[num].device = dev;
-}
-
 void ttyclose(size_t num)
 {
   ttys[num].flags |= TTY_CLS;
   release(&(ttys[num].lock));
-}
-
-char *ttyread(size_t num)
-{
-  if (num > MAXTTY)
-    return NULL_PTR;
-  if (ttys[num].lock.locked == 1)
-    return NULL_PTR;
-
-  return blkreads(ttys[num].device);
-}
-
-int ttywrite(size_t num, char *dev)
-{
-  if (num > MAXTTY)
-    return -1;
-  if (ttys[num].lock.locked == 1)
-    return -1;
-
-  blkwrites(ttys[num].device, dev);
-  return 0;
 }
 
 void ttyraise(size_t num)

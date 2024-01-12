@@ -554,9 +554,113 @@ struct stat fstat(struct file f)
   return i;
 }
 
-int isdir(struct file u)
+int isdir(char* name)
 {
-  return (u.flags & F_DIR);
+  ext2_inode inode;
+  ext2_find_file_inode(name, &inode, fs_dev, (void*)fs_dev->priv);
+  return inode.type == INODE_TYPE_DIRECTORY;
+}
+
+#define MAX_MOUNTS 10
+struct {
+  char* name;
+  ext2_gen_device* dev;
+} mount_points[MAX_MOUNTS];
+
+int mount(char* name, filesystem* ops)
+{
+  if(ops == NULL_PTR) 
+    ops = fs_dev->fs;
+  for(int i = 0;i < MAX_MOUNTS;i++) {
+    if(mount_points[i].dev == NULL_PTR)
+    {
+      mount_points[i].name = name;
+      mount_points[i].dev = kalloc(sizeof(ext2_gen_device), KERN_MEM);
+      ext2_gen_device* dev = mount_points[i].dev;
+      dev->fs = ops;
+      dev->offset = 0;
+      return i;
+    }
+  }
+}
+
+void fix_path(char* path)
+{
+  strrep(path, '\\', '/');
+  for(int i = 0;path[i] != '\0';i++)
+  {
+    if(strchr(":.,^&$#@%", path[i]))
+      path[i] = ' ';
+  }
+}
+
+int lsdir(char* dir, char** paths)
+{
+  char *orig = (char *)malloc(strlen(dir) + 1);
+	memset(orig, 0, strlen(dir) + 1);
+	memcpy(orig, dir, strlen(dir) + 1);
+  size_t len = 0, j = 0;
+	while(1)
+	{
+		for(int i = 0; i < MAX_MOUNTS; i++)
+		{
+			if(!mount_points[i].dev) break;
+			if(strcmp(mount_points[i].name, orig) == 0)
+			{
+				/* Then adjust and send. */
+				mount_points[i].dev->fs->read_dir(dir + strlen(mount_points[i].name) - 1,
+					paths[j], mount_points[i].dev, mount_points[i].dev->fs->priv_data);
+				for(int k = 0; k < MAX_MOUNTS; k++)
+				{
+					if(!mount_points[k].dev) break;
+					char *mount = (char *)malloc(strlen(mount_points[k].name) + 1);
+					memcpy(mount, mount_points[k].name, strlen(mount_points[k].name) + 1);
+					str_backspace(mount, '/');
+					if(strcmp(mount, dir) == 0)
+					{
+						char *p = mount_points[k].name + strlen(dir);
+						if(strlen(p) == 0 || strlen(p) == 1) continue;
+						strcpy(paths[i++], p);
+					}
+					free(mount);
+				}
+				break;
+			}
+		}
+		if(strcmp(orig, "/") == 0) break;
+		str_backspace(orig, '/');
+	}
+	free(orig);
+	return 1;
+}
+
+int find_mount(char* filename, int* adjust)
+{
+  fix_path(filename);
+  char *orig = (char *)malloc(strlen(filename) + 1);
+	memset(orig, 0, strlen(filename) + 1);
+	memcpy(orig, filename, strlen(filename) + 1);
+	if(orig[strlen(orig)] == '/') str_backspace(orig, '/');
+  for(int i = 0;i < MAX_MOUNTS;i++) {
+    if(!mount_points[i].dev) break;
+    if(strcmp(orig, mount_points[i].name))
+    {
+        *adjust = strlen(orig) - 1;
+    }
+  }
+  if(strcmp(orig, "/") == 0)
+			return;
+	str_backspace(orig, '/');
+}
+
+uint8_t fsread(char *filename, char *buffer)
+{
+	 int adjust = 0;
+	 int i = find_mount(filename, &adjust);
+	 filename += adjust;
+	 int rc = mount_points[i].dev->fs->read(filename, buffer,
+				mount_points[i].dev, mount_points[i].dev->fs->priv_data);
+	 return rc;
 }
 
 struct file mkdir(char *dname, struct file *parent)
@@ -565,19 +669,18 @@ struct file mkdir(char *dname, struct file *parent)
   _Dir.parent = parent;
   _Dir.name = dname;
   _Dir.flags = (F_RDWR | F_DIR);
-  parent->children[++parent->chno] = (&_Dir);
+  ext2_touch(dname, fs_dev, (ext2_priv_data*)fs_dev->priv);
   return _Dir;
 }
 
 void mkfs()
 {
   struct file *_ROOT = &root;
-  _ROOT->children = (struct file **)0x100FF00;
   mkdir("/home/lib", _ROOT);
   mkdir("/home/user", _ROOT);
   mkdir("/home/bin", _ROOT);
   mkdir("/home/etc", _ROOT);
-  mkdir("/home/sys", _ROOT);
+  mount("/home/sys", NULL_PTR); // change it later (by default the fs of fs_dev)
 }
 
 void rmdir(struct file u)
@@ -585,7 +688,6 @@ void rmdir(struct file u)
   u.parent = 0;
   u.fd = 0;
 }
-
 
 int _getfd(void* data, int type){
   int fd = 0;
@@ -599,7 +701,7 @@ int _getfd(void* data, int type){
 int _open(char* filename, int perms)
 {
   if(!fs_dev)
-    fs_dev = ext2_from_ata(0);
+    fs_dev = ext2_from_ata(filename[0] - '0');
   ext2_inode inode;
   ext2_priv_data data;
   data.blocksize = 1; // 1 sector
@@ -609,59 +711,18 @@ int _open(char* filename, int perms)
 
 int _read(int fd, struct buf *buffer, size_t buffer_sz)
 {
-  if (buffer != 0)
-  {
-    if (fd == 0)
-    {
-      memcpy((void *)buffer->data, BUFFER, buffer_sz); // copies from the text buffer
-      return 0;
-    }
-    if (fd == 1)
-    {
-      memcpy((void *)buffer->data, kbdbuf, buffer_sz); // copies from kbd buffer
-      return 0;
-    }
-    if (fd > 0x1C0000 && fd < 0x1CFFFF && (buffer->flags & 0x8))
-    {
-      insl(fd - 0x1C0000, buffer->data, buffer_sz); // 
-    }
-    buffer->blockno = (int)fd / BSIZE;
-    bread(buffer, buffer->dev);
-  }
+  if (buffer == NULL_PTR)
+    return -1;
+
+  ext2_read_file(NULL_PTR, (char*)buffer->data, fs_dev, (ext2_priv_data*)fs_dev->priv);  
   return 0;
 }
 
 int _write(int fd, struct buf *buffer, size_t buffer_sz)
 {
-  if (buffer != 0)
-  {
-    if (fd == 0)
-    {
-      memcpy(BUFFER, (void *)buffer->data, buffer_sz);
-      return 0;
-    }
-    if (fd == 1)
-    {
-      memcpy(kbdbuf, (void *)buffer->data, buffer_sz);
-      return 0;
-    }
-    if (fd > 0x1C0000 && fd < 0x1CFFFF && (buffer->flags & 0x8))
-    {
-      outsl(fd - 0x1C0000, buffer->data, buffer_sz);
-    }
-    buffer->blockno = (int)fd / BSIZE;
-    bwrite(buffer, buffer->dev);
-  }
+  if(buffer == NULL_PTR)
+    return -1;
   return 0;
-}
-
-char* _readx(int fd,int flags) // reads 512 bytes
-{
-  struct buf* b = kalloc(sizeof(struct buf*),KERN_MEM);
-  b->flags = B_VALID | flags;
-  b->dev = 0;
-  _read(fd,b,512);
-  return (char*)b->data;
 }
 
 void qbuf(struct buf* b, char* p){ // writes the data from queue to p
@@ -707,26 +768,15 @@ void log_write(struct buf *b)
   release(&log.lock);
 }
 
-void rmfile(struct file u)
+void rmfile(char* name)
 {
-  struct buf *k = fbuf(u);
-  bclr(k);
-  k->flags = B_DIRTY;
-  iderw(k); // clears the data from DISK
-  brelse(k);
-  u.fd = u.parent = 0; // unlink()
+  ext2_removefile(name, fs_dev, (ext2_priv_data*)fs_dev->priv);
 }
 
-void rrmdir(struct file dir)
+void rrmdir(char* name)
 {
-  int i = 0;
-  if (dir.children != 0)
-    while (dir.children[i] != 0)
-    {
-      rmfile(*dir.children[i]);
-      i++;
-    }
-  rmdir(dir);
+  ext2_list_directory(name, block_buf, fs_dev, fs_dev->priv);
+  rmdir(name);
 }
 
 #define IPB (512 / sizeof(struct dinode))
@@ -775,6 +825,7 @@ void fs_init()
   fs_dev = (ext2_gen_device*)kalloc(sizeof(ext2_gen_device), KERN_MEM);
   ext2_probe(fs_dev);
   setuproot();
+  mkfs();
 }
 
 struct drive
