@@ -51,12 +51,19 @@ char* __USER_DENIED loadpwd() // xor decrypt the password
 {
   struct buf* x = TALLOC(struct buf);
   _read(20, x, 128);
-  int n;
-  while(x->data[n])
+  int n = 0;
+  while(x->data[n]) {
     x->data[n] = x->data[n] ^ 0x1;
+    n++;
+  }
 }
 
-
+void user_init()
+{
+  int fd = prfopen(myproc(), "/home/users", F_READ);
+  _readx()
+  cnuser.name = 
+}
 
 int setuid(int _id){
   if(_id > 0)
@@ -64,8 +71,10 @@ int setuid(int _id){
   else{
     char* x = getl(); // gets the password from kbd
     char* p = loadpwd();
-    if(strcmp(x,p) == 0)
-      cnuser.uid = 0, return 0;
+    if(strcmp(x,p) == 0) {
+      cnuser.uid = 0;
+      return 0;
+    }
     kprint("\nerror: wrong password");
     free(x), free(p);
   }

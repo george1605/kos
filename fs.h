@@ -3,6 +3,7 @@
 #include "ata.h"
 #include "mem.h"
 #include "lib.c"
+#include "./modules/ext2.h"
 #define F_NEW 1
 #define F_READ 2
 #define F_WRITE 4
@@ -21,6 +22,7 @@
 #define ERR_BADDISK 0xA9
 #define ERR_BIGLOG 0xAA
 #define ERR_OUTTRANS 0xAB
+ext2_gen_device* fs_dev;
 
 struct buf* ata_read(size_t dev, size_t sector)
 {
@@ -88,6 +90,16 @@ struct ftable {
   int fcnt;
   struct spinlock lock;
 };
+
+void setuproot()
+{
+  if(fs_dev == NULL_PTR)
+    return;
+  
+  filesystem* fs = fs_dev->fs;
+  fs->touch("/home", fs_dev, NULL_PTR);
+  root.parent = NULL_PTR;
+}
 
 void faddtab(struct file i, struct ftable u){ // adds the file to the FILETABLE
   acquire(&u.lock);
@@ -202,6 +214,15 @@ char *getpath(char *bytes)
   return u;
 }
 
+void nmdir(char* name)
+{
+  int dir = 0;
+  if(name[0] >= '0')
+      dir = name[0] - '0';
+  ext2_gen_device* dev = ext2_from_ata(dir);
+  ext2_read_root_directory(name + 2, dev, (ext2_priv_data*)NULL_PTR);
+}
+
 #define VER_WRITE F_RDWR
 #define VER_READ F_READ
 
@@ -287,39 +308,6 @@ struct inode
   size_t addrs[NDIRECT + 1];
 };
 
-struct _icache {
-  struct inode* inodes[50];
-  struct spinlock lock;
-  int n;
-} icache;
-
-struct inode* iget(int dev, int inum){
-  int i;
-  for(i = 0;i < 50;i++)
-    if(icache.inodes[i]->dev == dev && icache.inodes[i]->inum == inum)
-      return icache.inodes[i];
-      
-  return (struct inode*)0;
-}
-
-int ipush(struct inode* i){
-  if(icache.n == 50)
-    return 0;
-
-  icache.inodes[++icache.n] = i;
-  return 1;
-}
-
-void iunlink(struct inode *ind){
-  int i;
-  for(i = 0;i < 13;i++)
-    ind->addrs[i] = 0;
-}
-
-void ilink(struct inode *ind, struct buf* b){
-  ind->addrs[12] = (int)b;
-}
-
 int lastinum = 0;
 
 struct dentry
@@ -327,10 +315,6 @@ struct dentry
   char *name;
   struct inode ind;
 };
-
-void dunlink(struct dentry d){
-  iunlink(&d.ind);
-}
 
 struct dentry dennew(char *dname, int dev)
 {
@@ -341,7 +325,6 @@ struct dentry dennew(char *dname, int dev)
   u.ind.flags = F_NEW;
   return u;
 }
-
 
 struct logheader
 {
@@ -359,38 +342,6 @@ struct log
   int dev;
   struct logheader lh;
 } log;
-
-void mkbin(char *data, int fd, int dev)
-{
-  struct buf *b = TALLOC(struct buf);
-  b->data[0] = 0x5F;
-  b->data[1] = 'B';
-  b->data[2] = 'I';
-  b->data[3] = 'N'; /* BIN signature */
-  if (data != 0)
-  {
-    memcpy(b->data, data, 512 - 4);
-  }
-  b->blockno = fd / 512;
-  b->dev = dev;
-  bwrite(b, dev);
-}
-
-void mkimg(char *data, int fd, int dev)
-{
-  struct buf *b = TALLOC(struct buf);
-  b->data[0] = 0x5E;
-  b->data[1] = 'I';
-  b->data[2] = 'M';
-  b->data[3] = 'G'; /* IMG signature */
-  if (data != 0)
-  {
-    memcpy(b->data, data, 512 - 4);
-  }
-  b->blockno = fd / 512;
-  b->dev = dev;
-  bwrite(b, dev);
-}
 
 void waitlog(struct log u)
 {
@@ -645,6 +596,17 @@ int _getfd(void* data, int type){
   return fd;
 }
 
+int _open(char* filename, int perms)
+{
+  if(!fs_dev)
+    fs_dev = ext2_from_ata(0);
+  ext2_inode inode;
+  ext2_priv_data data;
+  data.blocksize = 1; // 1 sector
+  ext2_find_file_inode(filename, &inode, fs_dev, &data);
+  return inode.gen_no;
+}
+
 int _read(int fd, struct buf *buffer, size_t buffer_sz)
 {
   if (buffer != 0)
@@ -807,11 +769,12 @@ struct file opfile(char *fname)
 
 void fs_init()
 {
-  root.name = (char *)"/home";
-  root.fd = 4096; // the sector no. 8
-  root.parent = (struct file *)0;
   ideinit();
   idenew();
+  ata_init(); // add all of them here (flash_init also)
+  fs_dev = (ext2_gen_device*)kalloc(sizeof(ext2_gen_device), KERN_MEM);
+  ext2_probe(fs_dev);
+  setuproot();
 }
 
 struct drive
@@ -920,6 +883,16 @@ void fclose(struct file* f)
   f->open = 0;
   f->parent = NULL_PTR;
   idewait(0);
+}
+
+void fsdump()
+{
+  if(!fs_dev)
+  {
+    printf("No info to display\n");
+    return;
+  }
+  printf("Sectors read & written: %i", fs_dev->offset); // not nec. an offset, just a counter
 }
 
 struct fat_diren

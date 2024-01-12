@@ -5,57 +5,7 @@
 #include "../../dma.h"
 #include "../blockdev.h"
 #include "defs.h" // include the struct definitions (yeey)
-
-#define NOUVEAU_GETPARAM_PCI_VENDOR      3
-#define NOUVEAU_GETPARAM_PCI_DEVICE      4
-#define NOUVEAU_GETPARAM_BUS_TYPE        5
-#define NOUVEAU_GETPARAM_FB_SIZE         8
-#define NOUVEAU_GETPARAM_AGP_SIZE        9
-#define NOUVEAU_GETPARAM_CHIPSET_ID      11
-#define NOUVEAU_GETPARAM_VM_VRAM_BASE    12
-#define NOUVEAU_GETPARAM_GRAPH_UNITS     13
-#define NOUVEAU_GETPARAM_PTIMER_TIME     14
-#define NOUVEAU_GETPARAM_HAS_BO_USAGE    15
-#define NOUVEAU_GETPARAM_HAS_PAGEFLIP    16
 #define _mesa_assert(check, msg) do { if(!(check)) { printf(msg, #check); _mesa_unload(); } } while(0)
-
-struct drm_nouveau_getparam {
-	uint64_t param;
-	uint64_t value;
-};
-
-struct drm_nouveau_channel_alloc {
-	uint32_t   fb_ctxdma_handle;
-	uint32_t   tt_ctxdma_handle;
-	uint32_t   channel;
-	uint32_t   pushbuf_domains;
-	uint32_t   notifier_handle;
-	struct {
-		uint32_t handle;
-		uint32_t grclass;
-	} subchan[8];
-	uint32_t nr_subchan;
-};
-
-struct drm_nouveau_channel_free {
-	uint32_t channel;
-};
-
-struct drm_nouveau_gem_info {
-	uint32_t handle;
-	uint32_t domain;
-	uint64_t size;
-	uint64_t offset;
-	uint64_t map_handle;
-	uint32_t tile_mode;
-	uint32_t tile_flags;
-};
-
-struct drm_nouveau_gem_new {
-	struct drm_nouveau_gem_info info;
-	uint32_t channel_hint;
-	uint32_t align;
-};
 
 struct nouveau_cli {
 	struct nvif_client base;
@@ -93,7 +43,7 @@ struct nouveau_cli_work {
 static inline struct nouveau_uvmm * nouveau_cli_uvmm(struct nouveau_cli *cli)
 {
 	if (!cli || !cli->uvmm.vmm.cli)
-		return NULL;
+		return NULL_PTR;
 
 	return &cli->uvmm;
 }
@@ -127,7 +77,9 @@ static int nouveau_ioctl_gem_pushbuf(int fd, unsigned long request, void *arg)
 
 struct drm_device* mesa_frompci(struct pcidev* dev)
 {
-
+	struct drm_device* drmdev = kalloc(sizeof(struct drm_device), KERN_MEM);
+	drmdev->dev = dev; // pci device
+	return drmdev;
 }
 
 int nouveau_gem_ioctl_new(struct drm_device *dev, void *data,

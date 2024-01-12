@@ -56,6 +56,7 @@
 #define PCI_CLASS_SIGNAL_PROCESSING 0x11
 #define PCI_CLASS_COPROCESSOR 0x40
 #define PCI_PROGIF_XHCI 0x30
+#define PCI_INTERRUPT_LINE 0x3c
 
 #define PCI_SUBCLASS_IDE 0x1
 #define PCI_SUBCLASS_FLOPPY 0x2
@@ -275,7 +276,7 @@ void pci_setup(struct pcidev *_Devs, int _DevNo)
 						if (pci_checks(i, j, k))
 						{
 							pci_add(i, j, k);
-							kprint("Found PCI device\n");
+							printf("Found PCI device [%i, %i, %i]\n", i, j, k);
 						}
 					}
 				}
@@ -354,6 +355,6 @@ struct vfile* pci_vfsmap(struct pcidev dev)
 }
 
 uint16_t pci_find_type(uint32_t dev) {
-	pcidev d = {.device = dev};
+	struct pcidev d = {.device = dev};
 	return (pciget(d, PCI_CLASS) << 8) | pciget(d, PCI_SUBCLASS);
 }

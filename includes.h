@@ -19,6 +19,7 @@
 #include "pit.c"
 #include "system.h"
 #include "pnp.h"
+#include "drivers/soundcard.h"
 
 #define FATAL_MEMCOR 0x8
 #define FAULTY_DEV 0x9
@@ -97,6 +98,7 @@ void init()
   kbd_init();
   mouse_init();
   timer_init();
+  dsp_init();
   switch_long_mode();
   sysc_load();
   kprint("x64 Mode Activated. (Respect +)");
@@ -134,9 +136,13 @@ void mysh(char *comm)
 
 void kernel_close()
 {
+  int i;
+  for(i = 0;i < prlist.cnt;i++)
+    kprexit(&prlist.procs[i], 0);
   pci_unload();
   irq_uninstall_handler(0); 
   irq_uninstall_handler(1);
   vfsrem();
+  sfree(); // deallocate kern memory
   acpi_shutdown(); // shutdown
 }

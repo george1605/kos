@@ -1,7 +1,12 @@
 #pragma once
 #include "netutl.h"
 #include "port.h"
-#include "mem.h"
+#include "smem.h"
+#include "pci.h" // to grab the devices!
+#include "process.h"
+#include "id.h" // Let's use it for port mapping, shall we?
+#include "./modules/ext2.h"
+
 #define ROK     (1<<0)
 #define RER     (1<<1)
 #define TOK     (1<<2)
@@ -64,9 +69,14 @@ struct rtldev {
     char *rx_buffer;
     int tx_cur;
 } rtl_device;
+ext2_gen_device* netmount; // mount point for Ext2
+struct idr* netports;
 
 struct ethframe {
-
+  uint8_t dst_mac_addr[6];
+  uint8_t src_mac_addr[6];
+  uint16_t type;
+  uint8_t data[];
 };
 
 int TSAD_array[16];
@@ -109,16 +119,20 @@ struct sockaddr {
 };
 
 uint8_t broadcast_mac[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+void nethandle(void* packet, size_t size)
+{
+    printf("Got packet with size = %i", size);
+}
 
-void receive_packet()
+void rtl8139_receive_packet(uint8_t* buf, size_t* len)
 {
     uint16_t *t = (uint16_t *)(rtl_device.rx_buffer + current_packet_ptr);
     uint16_t packet_length = *(t + 1);
+    *len = packet_length;
 
     t = t + 2;
-    void *packet = kalloc(packet_length, USER_MEM);
+    void *packet = buf;
     memcpy(packet, t, packet_length);
-    nethandle(packet, packet_length);
 
     current_packet_ptr = (current_packet_ptr + packet_length + 4 + 3) & RX_READ_POINTER_MASK;
 
@@ -128,19 +142,150 @@ void receive_packet()
     outports(rtl_device.io_base + CAPR, current_packet_ptr - 0x10);
 }
 
-void nethandle(void* packet, int len){
+static void __rtl_read(struct vfile* vf, char* buffer, size_t size)
+{
+    if(size == 0)
+        memcpy(buffer, rtl_device.mac_addr, 6);
+    else
+        memcpy(buffer, rtl_device.rx_buffer, size);
+}
+
+static void __rtl_write(struct vfile* vf, char* buffer, size_t size)
+{
+    rtl8139_send_packet(buffer, size);
+}
+
+struct vfile* rtl8139_map()
+{
+    if(rtl_device.rx_buffer == NULL_PTR)
+        return (struct vfile*)NULL_PTR;
+    struct vfile* vf = (struct vfile*)kalloc(sizeof(struct vfile), KERN_MEM);
+    vf->drno = 0x8139;
+    vf->name = "/home/dev/rtl8139";
+    vf->mem = vmap((void*)rtl_device.mem_base, 0, 0, (struct vfile*)NULL_PTR);
+    vf->ops = kalloc(sizeof(struct vfileops), KERN_MEM);
+    struct vfileops* ops = (struct vfileops*)vf->ops;
+    ops->read = __rtl_read;
+    ops->write = __rtl_write;
+    return vf;
+}
+
+void ip_handle(void* data)
+{
+    // handle the IP layer
+}
+
+void arp_handle(void* data)
+{
+    // handle the ARP message
+}
+
+#define ETHERNET_TYPE_ARP 0x0806
+#define ETHERNET_TYPE_IP  0x0800
+
+void __rtl_ext_read(uint8_t* buf, size_t offset, size_t len, ext2_gen_device* dev)
+{
+    // handle a packet
+    size_t len;
+    rtl8139_receive_packet(buf, &len);
+    struct ethframe* frame = (struct ethframe*)buf;
+    if(!memcmp((char*)rtl_device.mac_addr, (char*)frame->dst_mac_addr))
+    {
+        kprint("Got package!");
+    }
+    if(frame->type == ETHERNET_TYPE_IP)
+        ip_handle(frame->data);
+    else if(frame->type == ETHERNET_TYPE_ARP)
+        arp_handle(frame->data);
+    else    
+        kprint("Unknown ethernet type!");
+    dev->offset += len; // you can use this to see how many bytes were read.
+}
+
+int valid_frame(struct ethframe* frame)
+{
+    if(frame->type != ETHERNET_TYPE_IP && frame->type != ETHERNET_TYPE_ARP)
+        return 0;
+    return 1;
+}
+
+void __rtl_ext_write(uint8_t* buf, size_t offset, size_t len, ext2_gen_device* dev)
+{
+    struct ethframe* frame = (struct ethframe*)buf;
+    frame->type = htons(frame->type);
+    if(!valid_frame(frame))
+    {
+        kprint("Invalid frame!");
+    }
+    rtl8139_send_packet(frame, len);
+}
+// inits a inode and a device
+void rtl8139_map_ext2(ext2_inode* inode, ext2_gen_device* dev)
+{
+    if(inode != NULL_PTR) {
+        inode->create_time = cmos_read(SECS);
+        inode->type = INODE_TYPE_CHAR_DEV;
+        inode->disk_sectors = 0;
+    }
+
+    dev->read = __rtl_ext_read;
+    dev->write = __rtl_ext_write;
+    dev->offset = 0;
+    dev->dev_no = 0x8139;
+    dev->priv = kalloc(sizeof(ext2_priv_data)); 
+}
+
+void rtl8139_handler(struct regs* r){
   uint16_t status = inports(rtl_device.io_base + 0x3e);
 
   if(status & TOK) {
         
   }
   if (status & ROK) {
-        //kprint("Received packet\n");
+    
   }
 
   outports(rtl_device.io_base + 0x3E, 0x5);
 }
 
+int rtl8139_setup()
+{
+    struct pcidev dev = pci_get_device(RTL8139_VENDOR_ID, RTL8139_DEVICE_ID, -1);
+    size_t ret = pci_readt(dev, PCI_BAR0);
+    rtl_device.bar_type = ret & 0x1;
+    rtl_device.mem_base = ret & (~0xf);
+    rtl_device.io_base = ret & (~0x3);
+    rtl_device.tx_cur = 0;
+    uint32_t pci_command_reg = pci_readt(dev, PCI_COMMAND);
+    if(!(pci_command_reg & (1 << 2))) {
+        pci_command_reg |= (1 << 2);
+        pciwrites(dev.bus, dev.slot, dev.func, PCI_COMMAND, pci_command_reg);
+    }
+    outportb(rtl_device.io_base + 0x52, 0x0);
+    outportb(rtl_device.io_base + 0x37, 0x10);
+    while((inportb(rtl_device.io_base + 0x37) & 0x10) != 0) {
+        // Do nothibg here...
+    }
+    rtl_device.rx_buffer = (char*)kalloc(8192 + 16 + 1500, KERN_MEM);
+    memset(rtl_device.rx_buffer, 0x0, 8192 + 16 + 1500);
+    outportl(rtl_device.io_base + 0x30, (uint32_t)rtl_device.rx_buffer);
+    outports(rtl_device.io_base + 0x3C, 0x0005);
+    outportl(rtl_device.io_base + 0x44, 0xf | (1 << 7));
+    outportb(rtl_device.io_base + 0x37, 0x0C);
+    uint32_t irq_num = pci_readt(dev, PCI_INTERRUPT_LINE);
+    irq_install_handler(irq_num, rtl8139_handler);
+    rtl8139_map_ext2((ext2_inode*)NULL_PTR, netmount);
+    ext2_mount(netmount, NULL_PTR);
+    return 0;
+}
+
+// Get TCP Port not used by any process
+uint16_t netallocport()
+{
+    if(netports == NULL_PTR)
+        netports = idr_setup();
+    return (uint16_t)idr_alloc_id(netports);
+}
 
 void netwritecmd(uint16_t p_address, size_t p_value)
 {

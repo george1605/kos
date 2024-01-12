@@ -1,5 +1,4 @@
 #pragma once
-#include "net.h"
 #include "kb.c"
 #include "lib.c"
 #include "floppy.h"
@@ -196,7 +195,7 @@ void vfswrite(struct vfile u, char *str)
   }
   else
   {
-    rtl8139_send_packet(u.mem, strlen(u.mem));
+    // rtl8139_send_packet(u.mem, strlen(u.mem));
   }
 }
 
@@ -427,4 +426,16 @@ void* vmapx(void* phys, void* virt, size_t size, size_t flags, struct vfile* fil
     vfsread(*file, (char*)virt, size);
   }
   return addr;
+}
+
+struct vfile* fmemopen_k(void* memory, size_t size, int prot)
+{
+  struct vfile* vf = kalloc(sizeof(struct vfile), KERN_MEM);
+  if(memory == NULL_PTR)
+    memory = kalloc(size, USER_MEM);
+  vf->mem = memory;
+  vf->size = size;
+  vf->fd = fdalloc();
+  vf->status = prot;
+  return vf;
 }

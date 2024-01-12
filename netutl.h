@@ -27,6 +27,16 @@ uint32_t htonl(uint32_t hostlong)
     return flip_long(hostlong);
 }
 
+uint16_t ntohs(uint16_t netshort) 
+{
+    return flip_short(netshort);
+}
+
+uint32_t ntohl(uint32_t netlong) 
+{
+    return flip_long(netlong);
+}
+
 struct dhcppack {
     uint8_t op;
     uint8_t hardware_type;

@@ -2,12 +2,43 @@
 #include "../../irq.c"
 #include "../../vfs.h"
 #include "../../id.h" // id allocation
+#define NOUVEAU_GETPARAM_PCI_VENDOR      3
+#define NOUVEAU_GETPARAM_PCI_DEVICE      4
+#define NOUVEAU_GETPARAM_BUS_TYPE        5
+#define NOUVEAU_GETPARAM_FB_SIZE         8
+#define NOUVEAU_GETPARAM_AGP_SIZE        9
+#define NOUVEAU_GETPARAM_CHIPSET_ID      11
+#define NOUVEAU_GETPARAM_VM_VRAM_BASE    12
+#define NOUVEAU_GETPARAM_GRAPH_UNITS     13
+#define NOUVEAU_GETPARAM_PTIMER_TIME     14
+#define NOUVEAU_GETPARAM_HAS_BO_USAGE    15
+#define NOUVEAU_GETPARAM_HAS_PAGEFLIP    16
+
+#define NOUVEAU_GEM_PUSHBUF_SYNC  (1ULL << 0)
+#define NOUVEAU_GEM_RELOC_LOW  (1 << 0)
+#define NOUVEAU_GEM_RELOC_HIGH (1 << 1)
+#define NOUVEAU_GEM_RELOC_OR   (1 << 2)
+#define NOUVEAU_GEM_MAX_RELOCS 1024
 
 enum switch_power_state {
 	DRM_SWITCH_POWER_ON = 0,
 	DRM_SWITCH_POWER_OFF = 1,
 	DRM_SWITCH_POWER_CHANGING = 2,
 	DRM_SWITCH_POWER_DYNAMIC_OFF = 3,
+};
+
+struct drm_nouveau_gem_pushbuf {
+	uint32_t channel;
+	uint32_t nr_buffers;
+	uint64_t buffers;
+	uint32_t nr_relocs;
+	uint32_t nr_push;
+	uint64_t relocs;
+	uint64_t push;
+	uint32_t suffix0;
+	uint32_t suffix1;
+	uint64_t vram_available;
+	uint64_t gart_available;
 };
 
 struct drm_fb_helper_surface_size {
@@ -24,7 +55,58 @@ enum drm_gem_object_status {
 	DRM_GEM_OBJECT_PURGEABLE = BIT(1),
 };
 
+struct drm_nouveau_getparam {
+	uint64_t param;
+	uint64_t value;
+};
 
+struct drm_nouveau_channel_alloc {
+	uint32_t fb_ctxdma_handle;
+	uint32_t tt_ctxdma_handle;
+	uint32_t channel;
+	uint32_t pushbuf_domains;
+	uint32_t notifier_handle;
+	struct {
+		uint32_t handle;
+		uint32_t grclass;
+	} subchan[8];
+	uint32_t nr_subchan;
+};
+
+struct drm_nouveau_channel_free {
+	uint32_t channel;
+};
+
+struct drm_nouveau_gem_info {
+	uint32_t handle;
+	uint32_t domain;
+	uint64_t size;
+	uint64_t offset;
+	uint64_t map_handle;
+	uint32_t tile_mode;
+	uint32_t tile_flags;
+};
+
+struct drm_nouveau_gem_new {
+	struct drm_nouveau_gem_info info;
+	uint32_t channel_hint;
+	uint32_t align;
+};
+
+struct drm_modeset_lock {
+	struct ww_mutex mutex;
+	struct list_head head;
+};
+
+struct drm_modeset_acquire_ctx {
+	struct ww_acquire_ctx ww_ctx;
+	struct drm_modeset_lock *contended;
+
+	uint32_t stack_depot;
+	struct list_head locked;
+	char trylock_only;
+	char interruptible;
+};
 
 struct drm_mode_config {
 	struct spinlock mutex;
@@ -47,23 +129,7 @@ struct drm_mode_config {
 	 * @connector_ida: ID allocator for connector indices.
 	 */
 	struct ida connector_ida;
-	/**
-	 * @connector_list:
-	 *
-	 * List of connector objects linked with &drm_connector.head. Protected
-	 * by @connector_list_lock. Only use drm_for_each_connector_iter() and
-	 * &struct drm_connector_list_iter to walk this list.
-	 */
 	struct list_head connector_list;
-	/**
-	 * @connector_free_list:
-	 *
-	 * List of connector objects linked with &drm_connector.free_head.
-	 * Protected by @connector_list_lock. Used by
-	 * drm_for_each_connector_iter() and
-	 * &struct drm_connector_list_iter to savely free connectors using
-	 * @connector_free_work.
-	 */
 	struct llist_head connector_free_list;
 	/**
 	 * @connector_free_work: Work to clean up @connector_free_list.
@@ -94,27 +160,9 @@ struct drm_mode_config {
 	 * need any locks.
 	 */
 	int num_total_plane;
-	/**
-	 * @plane_list:
-	 *
-	 * List of plane objects linked with &drm_plane.head. This is invariant
-	 * over the lifetime of a device and hence doesn't need any locks.
-	 */
 	struct list_head plane_list;
 
-	/**
-	 * @num_crtc:
-	 *
-	 * Number of CRTCs on this device linked with &drm_crtc.head. This is invariant over the lifetime
-	 * of a device and hence doesn't need any locks.
-	 */
 	int num_crtc;
-	/**
-	 * @crtc_list:
-	 *
-	 * List of CRTC objects linked with &drm_crtc.head. This is invariant
-	 * over the lifetime of a device and hence doesn't need any locks.
-	 */
 	struct list_head crtc_list;
 	struct list_head property_list;
 	struct list_head privobj_list;
@@ -124,18 +172,11 @@ struct drm_mode_config {
 	const struct drm_mode_config_funcs *funcs;
 	size_t fb_base;
 
-	/* output poll support */
 	char poll_enabled;
 	char poll_running;
 	char delayed_event;
 	struct delayed_work output_poll_work;
 
-	/**
-	 * @blob_lock:
-	 *
-	 * Mutex for blob property allocation and management, protects
-	 * @property_blob_list and &drm_file.blobs.
-	 */
 	struct spinlock blob_lock;
 
 	/**

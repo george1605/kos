@@ -416,10 +416,26 @@ static inline int strchr(char *str, char ch)
   return -1;
 }
 
+size_t str_backspace(char* str, char c)
+{
+	size_t i = strlen(str);
+	i--;
+	while(i)
+	{
+		i--;
+		if(str[i] == c)
+		{
+			str[i+1] = 0;
+			return 1;
+		}
+	}
+	return 0;
+}
+
 static inline char* substr(char* x, size_t start, size_t size)
 {
   if(x == NULL_PTR) return (char*)NULL_PTR;
-  char* p = kalloc(size + 1, 2);
+  char* p = (char*)kalloc(size + 1, 2);
   memcpy(p, x + start, size);
   p[size - 1] = '\0';
   return p;

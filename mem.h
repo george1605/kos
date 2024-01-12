@@ -13,8 +13,8 @@
 #define _lm(x) (void *)(x + LM_NUM)
 #define PAGE_SIZE 4096
 
-int *heapbrk = _vm(10);
-int *lowbrk = _lm(10);
+char *heapbrk = (char*)_vm(0);
+char *lowbrk = (char*)_lm(0);
 int fblkcnt = 0;
 
 struct _fblock
@@ -34,20 +34,40 @@ typedef struct {
   int used;
 } kblockinfo;
 
-void *smalloc(int bytes)
+void addfree(void* ptr, size_t bytes)
 {
-  int *u = lowbrk;
-  lowbrk += bytes;
-  *u = 0xdeadbeef;
-  *(u + bytes) = 0;
-  return u;
+  for(int i = 0;i < fblkcnt;i++)
+  {
+    if(freeblks[i].ptr == NULL_PTR)
+    {
+      freeblks[i].ptr = ptr;
+      freeblks[i].size = bytes;
+    }
+  }
+}
+
+void remfree(void* ptr, size_t bytes)
+{
+  for(int i = 0;i < fblkcnt;i++)
+  {
+    if(freeblks[i].ptr == ptr)
+    {
+      freeblks[i].ptr = NULL_PTR;
+      freeblks[i].size = 0;
+    }
+  }
 }
 
 void* findfree(void* start, size_t bytes)
 {
+  void* ptr;
   for(int i = 0;i < fblkcnt;i++)
     if(freeblks[i].ptr >= start && freeblks[i].size - bytes < PAGE_SIZE)
-      return freeblks[i].ptr;
+    {
+      ptr = freeblks[i].ptr;
+      freeblks[i].ptr = NULL_PTR, freeblks[i].size = 0;
+      return ptr;
+    }
   return NULL_PTR;
 }
 
@@ -69,7 +89,22 @@ void *alloc(void *start, size_t bytes)
   kblockinfo* info = (kblockinfo*)p;
   info->used = 1;
   info->size = bytes;
+  remfree(start, bytes); // remove from the list
   return (void *)((char*)p + sizeof(kblockinfo));
+}
+
+void *smalloc(int bytes)
+{
+  char* ptr = (char*)alloc(lowbrk, bytes);
+  lowbrk += (bytes + sizeof(kblockinfo));
+  return ptr;
+}
+
+void sfree()
+{
+  char* l = (char*)_lm(0);
+  memset(l, 0, (char*)lowbrk - l);
+  lowbrk = l;
 }
 
 void *kcalloc(int blocks, int bytes)
@@ -94,30 +129,13 @@ struct mempage
 
 #define TALLOC(x) alloc(0, sizeof(x))
 
-void *pgalloc(int bytes)
-{
-  int *u = heapbrk;
-  heapbrk += (bytes + 2);
-  *(u + 1) = 0xdead2bad;
-  *(u + bytes) = 0;
-  return (u + 2);
-}
-
-void pgfree(int *page)
-{
-  if (page != 0)
-  {
-    *(page - 1) = 0;
-    *page = 0;
-  }
-}
-
-void *kalloc(int bytes, int mode)
+void *kalloc(size_t bytes, int mode)
 {
   if (mode == USER_MEM)
     return alloc(0, bytes);
   if (mode == KERN_MEM)
     return smalloc(bytes);
+  return NULL_PTR; // if mode isn't between these two, then returns NULL
 }
 
 void free(void *start)
@@ -127,7 +145,7 @@ void free(void *start)
     return;
   kblockinfo* info = (kblockinfo*)(start - sizeof(kblockinfo));
   info->used = 0;
-  memset(start, 0, info->size);
+  addfree(start, info->size);
 }
 
 void freeb(char *start)
@@ -175,17 +193,9 @@ void kfree(struct mempage *u)
   }
 }
 
-void sfree(void *ptr)
-{
-  while (!kvalmem(ptr))
-    ptr--;
-
-  *(int *)ptr = 0;
-}
-
 uint8_t *maptxt()
 {
-  return _iom(0xb8000);
+  return (uint8_t*)_iom(0xb8000);
 }
 
 struct circbuf
