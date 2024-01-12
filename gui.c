@@ -183,6 +183,42 @@ struct window
   long id;
 };
 
+struct wm // Window Manager
+{
+  char* name;
+  struct vscreen* scrn;
+  struct window*(*create)(char* name, int, int, int, int);
+  void(*remove)(struct window* win);
+  void(*move)(struct window* win, int, int);
+  void(*resize)(struct window* win, int, int);
+  void(*show)(struct window* win);
+  void(*hide)(struct window* win);
+} wmout; // <- we use this
+
+void kos_wm(struct wm* out)
+{
+  out->name = "KOSWM";
+  out->scrn = scrn_req(0);
+}
+
+void kos_createwin(char* name, int x, int y, int w, int h)
+{
+  if(w <= 0 || h <= 0) return;
+  if(!wmout.create)
+    kos_wm(&wmout);
+  wmout.create(name, x, y, w, h);
+}
+
+void kos_removewin(struct window* win)
+{
+  if(win == NULL_PTR)
+    return;
+  if(!wmout.create)
+    kos_wm(&wmout);
+  wout.remove(win);
+}
+
+/* defined in console.h (not this below)
 struct console
 {
   struct window win;
@@ -190,6 +226,7 @@ struct console
   size_t bkcolor;
   size_t color;
 };
+*/
 
 struct rect InnerRect(struct window u)
 { // the inner rectangle - excluding titlebar
