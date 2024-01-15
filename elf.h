@@ -4,6 +4,7 @@
 #include "smem.h"
 #include "pipe.c"
 #include "process.h"
+#include "fs.h"
 #define ELF_32 2
 #define ELF_64 4
 
@@ -81,6 +82,24 @@ void elfreadexec(struct vfile* vf)
   p.f = entry; // set the function pointer to the entry
   prappend(p); // add to the list
   sched(); // reschedule it
+}
+
+void elfload_ext(char* name, char* buffer)
+{
+  struct ElfHeader* header = (struct ElfHeader*)buffer;
+  fs_dev->fs->read(name, buffer, fs_dev, fs_dev->priv);
+  if(!checkelf(header))
+    return; // if the ELF magic isn't there
+    // Allocate memory for program headers
+}
+
+void elfexec_ext(char* name)
+{
+  char* buffer = kalloc(sizeof(struct ElfHeader), KERN_MEM); // to be changed
+  elfload_ext(name, buffer);
+  struct proc p = prcreat(name);
+  prappend(p);
+  sched();
 }
 
 struct ElfSection
@@ -212,15 +231,6 @@ struct proc execelf(struct ElfSection *u)
     pr.pid = 0;
   }
   return pr;
-}
-
-void killelf(struct proc _process, struct ElfSection *_elf)
-{
-  if (_process.pid != 0 && _elf != 0)
-  { // SECURITY MEASURE
-    prkill(_process);
-    _elf->active = 0;
-  }
 }
 
 void *checkelf(uint8_t *buffer)

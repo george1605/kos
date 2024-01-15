@@ -3,6 +3,7 @@
 #include "../fs.h"
 #include "../user.h"
 #include "../elf.h"
+#include "../console.h"
 int _seplen = 0;
 
 struct shell
@@ -30,9 +31,9 @@ char* strsep(char* s, char* delm)
 {
     static int currIndex = 0;
     if(!s || !delm || s[currIndex] == '\0')
-      return (char*)0;
+      return (char*)NULL_PTR;
 
-    char* W = (char*)alloc(0,100);
+    char* W = (char*)kalloc(100, KERN_MEM);
     int i = currIndex, k = 0, j = 0;
 
     while (s[i] != '\0'){
@@ -89,6 +90,27 @@ void argexec(int argc, char** argv){
   }else if(strcmp(argv[0], "shutdown")){
     glsig = SHUTDOWN;
   }else{
+    elfexec_ext(argv[0]);
     kprint("Unknown command\n");
   }
+}
+
+void at_exit()
+{
+  kdettach_console(myproc());
+}
+
+void shell_main(int argc, char** argv)
+{
+  struct console* cns = alloc_console();
+  kclear_console(myproc());
+  klog(cns, "Bash Shell\n");
+  klog(cns, "$ ");
+  int exit = 0; // if exited
+  while(!exit)
+  {
+    buffer = getl();
+    argexec(argc, argv);
+  }
+  
 }

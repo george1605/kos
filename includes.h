@@ -16,6 +16,7 @@
 #include "speaker.h"
 #include "process.h"
 #include "uart.c"
+#include "user.h"
 #include "pit.c"
 #include "system.h"
 #include "pnp.h"
@@ -100,10 +101,11 @@ void init()
   timer_init();
   dsp_init();
   switch_long_mode();
-  sysc_load();
+  syscinit();
   kprint("x64 Mode Activated. (Respect +)");
   fs_init();
   vfsinit();
+  user_init();
   ttyinit(0);
 #ifdef __PNP__
   JOYSTICK_RESET();

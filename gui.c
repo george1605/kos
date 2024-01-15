@@ -2,6 +2,7 @@
 #include "screen.h"
 #include "mem.h"
 #include "font.h"
+#include "shl.h"
 size_t titlebar_colors[26] = {0xff59584f, 0xff5f5d53, 0xff58564e, 0xff57554d, 0xff56544c, 0xff55534b,
                               0xff54524a, 0xff525049, 0xff514f48, 0xff504e47, 0xff4e4c45, 0xff4e4c45,
                               0xff4c4a44, 0xff4b4943, 0xff4a4842, 0xff484741, 0xff46453f, 0xff45443f,
@@ -195,6 +196,34 @@ struct wm // Window Manager
   void(*hide)(struct window* win);
 } wmout; // <- we use this
 
+void __kos_def_create(char* name, int x, int y, int w, int h)
+{
+  vbecolor = 0xffffff;
+  struct font def_font;
+  DrawText(name, def_font);
+  DrawRectC(x, y, w, h);
+}
+
+int kos_has_wm()
+{
+  if(wmout.scrn == NULL_PTR) return 0;
+  if(wmout.scrn->s_mem == NULL_PTR) return 0;
+  if(wmout.create == NULL_PTR) return 0;
+  return 1;
+}
+
+// load from a shared lib
+// TO DO!
+void kos_install_wm(struct SoHeader* header) 
+{
+  if(header == NULL_PTR)
+  {
+    wmout.create = __kos_def_create;
+  } else {
+
+  }
+}
+
 void kos_wm(struct wm* out)
 {
   out->name = "KOSWM";
@@ -215,7 +244,7 @@ void kos_removewin(struct window* win)
     return;
   if(!wmout.create)
     kos_wm(&wmout);
-  wout.remove(win);
+  wmout.remove(win);
 }
 
 /* defined in console.h (not this below)
@@ -446,22 +475,6 @@ void DestroyWindow(struct window u)
   bitmap *i = GetMap(u, 1);
   ShowMap(i);
   FreeMap(i);
-}
-
-struct console CreateConsole(func function, size_t bkcolor, size_t color)
-{
-  struct console i;
-  void *u = kalloc(80 * 25, USER_MEM);
-  i.process = prcreat("New Console");
-  i.process.stack = (char *)u;
-  i.process.f = function;
-  function(0, (char **)0);
-}
-
-void FreeConsole(struct console u)
-{
-  prkill(u.process);
-  DestroyWindow(u.win);
 }
 
 void DrawCursorMap(char crs[16][16], int x, int y)

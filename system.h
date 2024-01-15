@@ -123,9 +123,8 @@ __SYSCALL void sys_vfsread(void* arg1, void* arg2)
 
 __SYSCALL void sys_fclose(void* arg1)
 {
-  struct vfile vf;
-  vf.fd = (int)arg1;
-  vfsclose(&vf);
+  struct proc* p = myproc();
+  p->ofiles[(int)arg1].open = 0; // not open!
 }
 
 __SYSCALL void sys_write(void *arg1, void *arg2)
@@ -148,7 +147,7 @@ __SYSCALL void sys_rem(char* name)
 {
   if(!strcmp(name, "/home"))
     return;
-  ext2_removefile(name, fs_dev, fs_dev->priv);
+  ext2_removefile(name, fs_dev, (ext2_priv_data*)fs_dev->priv);
 }
 
 __SYSCALL void* sys_malloc(size_t size)
@@ -257,8 +256,6 @@ void sys_poll()
 {
 }
 
-
-
 struct pres
 {
   union
@@ -346,9 +343,9 @@ struct _rmem
   int n;
 } rmtable;
 
-void __SYSCALL sys_prwait(struct proc u)
+void __SYSCALL sys_prwait(int pid)
 {
-  
+  waitpid(pid); // just as that!
 }
 
 void __SYSCALL sys_fcall(uint64_t addr, void* _regs) 
@@ -364,28 +361,11 @@ void __SYSCALL sys_fcall(uint64_t addr, void* _regs)
     fcall(addr, u);
 }
 
-void __SYSCALL sys_resmem(void *mem, size_t size)
+void sys_mprotect(void* ptr, size_t size, int prot)
 {
-  struct rmentry i;
-  int *ptr = (int*)mem;
-  if ((int)ptr > 1 && rmtable.n < 16)
-  {
-    *(ptr - 1) = SYSRES;
-    *(ptr + size) = 0;
-    i.ptr = ptr;
-    i.size = size;
-    rmtable.entries[++rmtable.n] = i;
-  }
-}
-
-void restxt()
-{ // reserves the text buffer at 0xB8000
-  sys_resmem((void *)0xB8000, 80 * 25 + 1);
-}
-
-void resvid()
-{ // reserves the video memory
-  sys_resmem((void *)0xA0000, 200 * 320 + 1);
+  struct proc* p = myproc();
+  pagetable* tbl = (pagetable*)p->stack;
+  tlb_flush((uint64_t)tbl);
 }
 
 void sys_exit(void* arg1)

@@ -562,7 +562,7 @@ int isdir(char* name)
 }
 
 #define MAX_MOUNTS 10
-struct {
+struct mount {
   char* name;
   ext2_gen_device* dev;
 } mount_points[MAX_MOUNTS];
@@ -580,6 +580,24 @@ int mount(char* name, filesystem* ops)
       dev->fs = ops;
       dev->offset = 0;
       return i;
+    }
+  }
+}
+
+void mountread(const char* fname, char* buffer, size_t len)
+{
+  char* path;
+  size_t s;
+  for(int i = 0;i < MAX_MOUNTS;i++)
+  {
+    s = strlen(mount_points[i].name);
+    if(!memncmp(mount_points[i].name, fname, s))
+    {
+      path = strdup(fname);
+      path += s;
+      if(path[0] != '/') path[0] = '/';
+      mount_points[i].dev->fs->read(path, buffer, &mount_points[i].dev, mount_points[i].dev->priv);
+      break;
     }
   }
 }
@@ -663,6 +681,49 @@ uint8_t fsread(char *filename, char *buffer)
 	 return rc;
 }
 
+uint8_t fsexist(char *wd, char *fn)
+{
+	char *filename = (char *)malloc(strlen(wd) + 2 + strlen(fn));
+	memset(filename, 0, strlen(wd) + 2 + strlen(fn));
+	memcpy(filename, wd, strlen(wd));
+	memcpy(filename+strlen(wd), fn, strlen(fn));
+	memset(filename+strlen(wd)+strlen(fn) + 1, '\0', 1);
+
+	if(filename[strlen(filename)] != '/') 
+	{
+		uint32_t index = strlen(filename);
+		filename[index] = '/';
+		filename[index+1] = 0;
+	}
+	int rc = 0;
+	char *o = (char *)malloc(strlen(filename) + 2);
+	memset(o, 0, strlen(filename) + 2);
+	memcpy(o, filename, strlen(filename) + 1);
+
+	while(1)
+	{
+		for(int i = 0;i < MAX_MOUNTS; i++)
+		{
+			if(!mount_points[i].dev) break;
+			if(strcmp(o, mount_points[i].name) == 0)
+			{
+				filename += strlen(mount_points[i].name) - 1;
+				rc = mount_points[i].dev->fs->exist(filename,
+					mount_points[i].dev, mount_points[i].dev->fs->priv_data);
+				free(o);
+				free(filename);
+				return rc;
+			}
+		}
+		if(strcmp(o, "/") == 0)
+			break;
+		str_backspace(o, '/');
+	}
+	free(o);
+	free(filename);
+	return rc;
+}
+
 struct file mkdir(char *dname, struct file *parent)
 {
   struct file _Dir;
@@ -683,10 +744,10 @@ void mkfs()
   mount("/home/sys", NULL_PTR); // change it later (by default the fs of fs_dev)
 }
 
-void rmdir(struct file u)
+void rmdir(char* dir)
 {
-  u.parent = 0;
-  u.fd = 0;
+  ext2_inode inode;
+  ext2_find_file_inode(dir, &inode, fs_dev, (ext2_priv_data*)fs_dev->priv);
 }
 
 int _getfd(void* data, int type){
@@ -775,7 +836,8 @@ void rmfile(char* name)
 
 void rrmdir(char* name)
 {
-  ext2_list_directory(name, block_buf, fs_dev, fs_dev->priv);
+  char buf[300];
+  ext2_list_directory(name, buf, fs_dev, (ext2_priv_data*)fs_dev->priv);
   rmdir(name);
 }
 

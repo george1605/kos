@@ -409,6 +409,13 @@ typedef struct {
   pagetable* tbl;
 } arena;
 
+typedef struct {
+  arenablk* blocks;
+  int num_blocks;
+  pagetable* tbl;
+  struct spinlock lock;
+} karena;
+
 void* arena_alloc(arena* ar, size_t size, void*(*def_alloc)(size_t))
 {
   for(int i = 0;i < ar->num_blocks;i++) {
@@ -421,7 +428,16 @@ void* arena_alloc(arena* ar, size_t size, void*(*def_alloc)(size_t))
   return def_alloc(size);
 }
 
-// finds th first block and tries to merge it with next blocks
+void* karena_alloc(karena* ar, size_t size)
+{
+  void* p;
+  acquire(&(ar->lock));
+  p = arena_alloc((arena*)ar, size, safe_alloc);
+  release(&(ar->lock));
+  return p;
+}
+
+// finds the first block and tries to merge it with next blocks
 // if it can't then it uses def_alloc(size);
 void* arena_realloc(arena* ar, void* p, size_t size, void*(*def_realloc)(void*, size_t))
 {
@@ -504,20 +520,6 @@ void *ioremap(void* x, size_t len)
   map_page(x, y, 0);
   *(char*)y = 0xA0;
   return y;
-}
-
-void* newheap(int size)
-{
-  void* x = dyalloc(size + 0x10000);
-  *(int*)(x - 1) = size;
-  *(int*)x = 0xCD;
-  return x;
-}
-
-void freeheap(void* heap)
-{
-  int size = *(int*)(heap - 1);
-  memset(heap, 0, size);
 }
 
 struct list_head {

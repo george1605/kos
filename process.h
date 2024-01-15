@@ -136,7 +136,7 @@ struct sleeplock
 struct environ
 {
   struct context *ctx;
-  void *vars;
+  char *vars;
   int cpunum;
   int type;
 };
@@ -277,7 +277,7 @@ void waitproc(struct proc* p, int* state)
     p->state = STARTED;
   }
   if(state)
-    *state = p.ret; 
+    *state = p->ret; 
 }
 
 int findchild(int pid, struct proc** procs)
@@ -338,10 +338,8 @@ void prinit(struct proc u, struct proc *parent)
   u.pid = (++lpid);
   u.state = STARTED;
   u.stack = (char*)kalloc(64 * 1024, USER_MEM);
-  if (parent == (struct proc *)0)
-    u.parent = &tproc;
-  else
-    u.parent = parent;
+  u.parent = parent;
+  prappend(u);
   sched();
 }
 
@@ -598,6 +596,13 @@ void prfreeheap(struct proc* p, void* ptr)
   arena_free(ar, p);
 }
 
+void prsetupvm(struct proc* p)
+{
+  if(p == NULL_PTR)
+    p = myproc();
+  enable_paging((uint64_t)p->stack);
+}
+
 // looks for a unused cpu and starts the function there
 void schedinit(struct proc* p)
 {
@@ -622,6 +627,39 @@ void envinit(struct environ *u)
   u->ctx = kalloc(sizeof(struct context), KERN_MEM);
   memcpy(u->vars, "PATH=/home\n", 12);
   readctx(u->ctx);
+}
+
+void envadd(struct environ* u, char* key, char* val)
+{
+  strcat(u->vars, key);
+  strcat(u->vars, "=");
+  strcat(u->vars, val);
+  strcat(u->vars, ",");
+}
+
+void envget(struct environ* u, char* key, char** out)
+{
+  char* p = strtok0(u->vars, ',');
+  int found = 0;
+  size_t keysz = strlen(key);
+  while(p != NULL_PTR && !found)
+  {
+    if(!memncmp(p, key, keysz)) {
+      *out = strdup(p + keysz + 1);
+      return;
+    }
+    p = strtok0((char*)NULL_PTR, ',');
+  }
+  *out = (char*)NULL_PTR; // not found :(
+}
+
+void envfsread(struct environ* environ, char* fname)
+{
+  char* out, *buffer;
+  envget(environ, "PATH", &out);
+  strcat(buffer, out);
+  strcat(buffer, fname);
+  fsread(fname, );
 }
 
 void envpush(struct environ *u)
@@ -718,6 +756,21 @@ struct atomic
   struct spinlock alock; // lock for writing
   long value;
 };
+
+void prhuntzom()
+{
+  for(int i = 0;i < prlist.size;i++)
+  {
+    if(prlist.procs[i].state == ZOMBIE)
+    {
+      acquire(&(prlist.lock));
+      prlist.procs[i] = (struct proc){.pid = -1};
+      release(&(prlist.lock));
+      kprexit(&prlist.procs[i], -1); // to be clear!
+      sched(); // schedule it again
+    }
+  }
+}
 
 #define SIG_WRITEPIPE 0x10
 #define SIG_KILL 0x20

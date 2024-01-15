@@ -37,14 +37,14 @@ typedef struct _ssym
 	int type;
 } shlsym;
 
-void shlset(shl &u)
+void shlset(shl *u)
 {
-	u.flags = S_STDLIB;
-	u.info[0] = 0x7F;
-	u.info[1] = 'S';
-	u.info[2] = 'H';
-	u.info[3] = 'L';
-	u.info[4] = 32; // 32-bit
+	u->flags = S_STDLIB;
+	u->info[0] = 0x7F;
+	u->info[1] = 'E';
+	u->info[2] = 'L';
+	u->info[3] = 'F';
+	u->info[4] = 32; // 32-bit
 }
 
 struct buf *shlget(shl x)
