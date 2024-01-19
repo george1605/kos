@@ -531,17 +531,6 @@ void iunlock(struct inode *u)
   u->flags |= I_VALID;
 }
 
-struct stat
-{
-  unsigned long dev;
-  unsigned long ino;
-  unsigned int mode;
-  unsigned int nlink;
-  unsigned int uid;
-  unsigned int gid;
-  unsigned long rdev;
-};
-
 size_t fsize(struct file u)
 {
   return 0;
@@ -550,7 +539,7 @@ size_t fsize(struct file u)
 struct stat fstat(struct file f)
 {
   struct stat i;
-  i.uid = 1;
+  ext2_stat(f, &i, fs_dev, fs_dev->priv);
   return i;
 }
 
@@ -562,7 +551,7 @@ int isdir(char* name)
 }
 
 #define MAX_MOUNTS 10
-struct mount {
+struct __mount {
   char* name;
   ext2_gen_device* dev;
 } mount_points[MAX_MOUNTS];
@@ -575,13 +564,26 @@ int mount(char* name, filesystem* ops)
     if(mount_points[i].dev == NULL_PTR)
     {
       mount_points[i].name = name;
-      mount_points[i].dev = kalloc(sizeof(ext2_gen_device), KERN_MEM);
+      mount_points[i].dev = (ext2_gen_device*)kalloc(sizeof(ext2_gen_device), KERN_MEM);
       ext2_gen_device* dev = mount_points[i].dev;
       dev->fs = ops;
       dev->offset = 0;
       return i;
     }
   }
+}
+
+int unmount(char* name)
+{
+  for(int i = 0;i < MAX_MOUNTS;i++)
+    if(strcmp(mount_points[i].name, name) == 0)
+      {
+        free(mount_points[i].dev->fs);
+        mount_points[i].dev->fs = NULL_PTR;
+        free(mount_points[i].dev);
+        return 0;
+      }
+  return 1;
 }
 
 void mountread(const char* fname, char* buffer, size_t len)

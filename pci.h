@@ -345,6 +345,28 @@ inline size_t pci_baseaddr(uint8_t idx, struct pcidev dev)
 	return (bar & 0x1) ? (bar & 0xFFFFFFFFFFFFFFFC) : (bar & 0xFFFFFFFFFFFFFFF0);
 }
 
+uint32_t pci_read_field(uint32_t device, int field, int size) {
+	outportl(0xCF8, (uint64_t)pcie_addr(device, field));
+
+	if (size == 4) {
+		uint32_t t = inportl(0xCFC);
+		return t;
+	} else if (size == 2) {
+		uint16_t t = inports(0xCFC + (field & 2));
+		return t;
+	} else if (size == 1) {
+		uint8_t t = inportb(0xCFC + (field & 3));
+		return t;
+	}
+
+	return 0xFFFF;
+}
+
+uint32_t pci_get_interrupt(uint32_t device)
+{
+	return pci_read_field(device, PCI_INTERRUPT_LINE, 1);
+}
+
 struct vfile* pci_vfsmap(struct pcidev dev)
 {
 	struct vfile* vf = (struct vfile*)kalloc(sizeof(struct vfile), KERN_MEM);

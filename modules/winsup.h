@@ -9,6 +9,7 @@
 #include "../mutex.h"
 #include "../gui.c"
 #include "../time.c"
+#include "../process.h"
 
 #define IN
 #define OUT
@@ -84,6 +85,7 @@ typedef struct _STRING {
 } STRING;
 
 typedef STRING *PSTRING;
+typedef SIZE_T LONG;
 
 typedef struct _HBRUSH {
   SIZE_T unused;
@@ -115,6 +117,13 @@ NTSTATUS NtCreateTimer(
   return 0;
 }
 
+void* HeapAlloc(HANDLE hHeap, DWORD dwFlags, SIZE_T dwBytes) 
+{
+  arena* ar = (arena*)hHeap;
+  void* p = arena_alloc(ar, dwBytes, safe_alloc);
+  return p;
+}
+
 void NtCancelTimer(PHANDLE TimerHandle, int* CurrentState)
 {
   free(TimerHandle[0]); //frees the memory
@@ -144,10 +153,9 @@ HANDLE CreateThread(SIZE_T StackSize,LPTHREAD_START_ROUTINE lpStartAddress)
   return (HANDLE)(&mythread);
 }
 
-HANDLE CreateProcess()
+HANDLE CreateProcess(LPCSTR name, SIZE_T size)
 {
-  struct proc u = prcreat("");
-  return (HANDLE)(&u);
+  return (HANDLE)prnew_k(name, size);
 }
 
 void ExitThread(DWORD swExitCode)
@@ -157,12 +165,14 @@ void ExitThread(DWORD swExitCode)
 
 DWORD GetCurrentProcessId()
 {
-  return (DWORD)tproc.pid;
+  return myproc()->pid;
 }
 
-HWND CreateWindow()
+HWND CreateWindow(char* name, int x, int y, int w, int h, void* menu)
 {
-  return (DWORD)0;
+  struct window* win;
+  win = wmout.create(name, x, y, w, h);
+  return (HWND)win;
 }
 
 void MessageBoxA(HWND Handle,LPCSTR lpText,LPCSTR lpCaption,UINT lpFlags)

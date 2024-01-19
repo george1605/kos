@@ -3,6 +3,7 @@
 #include "smem.h"
 #include "fs.h"
 #include "dma.h"
+#include "elf.h"
 #define IOMEM_DMA 1
 #define VERSION(a,b,c) a * 1000 + b * 100 + c 
 #define MODULE_VERSION(str) obj->version = __make_version(str)
@@ -107,10 +108,12 @@ void drstartio(drentry k){
 
 #define EXPORT_DRIVER(x) drlist.funcs[++drlist.cnt] = (drentry)x
 
-void drload(struct file f)
+void drload(char* name)
 {
-  char* u = ata_read_sector(&ata_primary_master, f.fd);
-  EXPORT_DRIVER(u);
+  ElfHeader* buffer = (ElfHeader*)kalloc(sizeof(struct ElfHeader), KERN_MEM);
+  elfload_ext(name, (char*)buffer);
+  EXPORT_DRIVER(buffer->e_entry);
+  free(buffer);
 }
 
 void drivinit()

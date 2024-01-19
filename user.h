@@ -161,9 +161,9 @@ void user_chdir(char* name)
   }
 }
 
-void user_fsopen(char* name, int perms)
+int user_fsopen(char* name, int perms)
 {
-  char* path = kalloc(100, KERN_MEM);
+  char* path = (char*)kalloc(100, KERN_MEM);
   if((perms & F_WRITE) && (perms & F_EXEC)) // cannot be WX!
     perms &= ~F_WRITE;
   if(name[0] == '.' && name[1] == '/')

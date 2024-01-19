@@ -58,6 +58,7 @@ uint8_t ext2_errno;
 #define INODE_TYPE_FILE 0x8000
 #define INODE_TYPE_SYMLINK 0xA000
 #define INODE_TYPE_SOCKET 0xC000
+#define INODE_TYPE_SWAP 0xD000 // swap file, keep track of them
 
 #define TRANSACTION_WRITE 1
 #define TRANSACTION_READ 2
@@ -460,6 +461,34 @@ void ext2_alloc_block(uint32_t *out, ext2_gen_device *dev, ext2_priv_data *priv)
 	 }
 }
 
+// can allocate SWAP files
+void ext2_alloc_swap(size_t size, ext2_inode* inode, ext2_gen_device* dev, ext2_priv_data* data)
+{
+	inode->type = INODE_TYPE_SWAP;
+	size_t sz = 0, i = 0;
+	if(size > 12 * data->blocksize)
+	{
+		ext2_alloc_range(size / data->blocksize, &inode->dbp[0], &inode->dbp[1], dev, data);
+		return;
+	}
+	while(sz < size)
+	{
+		ext2_alloc_block(&inode->dbp[i], dev, data);
+		i++;
+		sz += data->blocksize;
+	}
+}
+
+void* ext2_malloc(size_t size, ext2_gen_device* dev, ext2_priv_data* priv)
+{
+	ext2_inode inode;
+	ext2_alloc_swap(size, &inode, dev, priv);
+	ext2_find_new_inode_id(&inode.gen_no, dev, priv);
+	ext2_write_inode(&inode, inode.gen_no, dev, priv);
+	struct vfile vf;
+	return vmap(NULL_PTR, size, PAGE_PRESENT | PAGE_WRITABLE, (struct vfile*)NULL_PTR);
+}
+
 int ext2_is_free(uint32_t block, ext2_gen_device* dev, ext2_priv_data* priv)
 {
 	ext2_read_block(block_buf, block, dev, priv);
@@ -600,7 +629,8 @@ uint8_t ext2_exist(char *file, ext2_gen_device *dev, ext2_priv_data *priv)
 
 void ext2_free_range(size_t first, size_t end, ext2_gen_device* dev, ext2_priv_data* priv)
 {
-
+	for(int i = first;i <= end;i++)
+		ext2_free_block(i, dev, priv);
 }
 
 void ext2_removefile(char* fn, ext2_gen_device* dev, ext2_priv_data* priv)
@@ -662,6 +692,35 @@ uint8_t ext2_writefile(char *fn, char *buf, uint32_t len, ext2_gen_device *dev, 
 		return 1;
 	}
  	return 0;
+}
+
+struct stat {
+    size_t     st_dev;     /* ID of device containing file */
+    uint32_t     st_ino;     /* inode number */
+    uint32_t    st_mode;    /* protection */
+    uint16_t   st_nlink;   /* number of hard links */
+    uint16_t     st_uid;     /* user ID of owner */
+    uint32_t     st_gid;     /* group ID of owner */
+    uint32_t     st_rdev;    /* device ID (if special file) */
+    uint32_t     st_size;    /* total size, in bytes */
+    uint32_t st_blksize; /* blocksize for file system I/O */
+    uint32_t  st_blocks;  /* number of 512B blocks allocated */
+    uint32_t    st_atime;   /* time of last access */
+    uint32_t    st_mtime;   /* time of last modification */
+    uint32_t    st_ctime;   /* time of last status change */
+};
+
+void ext2_stat(char* name, struct stat* status, ext2_gen_device* dev, ext2_priv_data* data)
+{
+	ext2_inode inode;
+	ext2_find_file_inode(name, &inode, dev, data);
+	status->st_atime = inode.last_access;
+	status->st_mtime = inode.last_modif;
+	status->st_blksize = data->blocksize;
+	status->st_uid = inode.uid;
+	status->st_gid = inode.gid;
+	status->st_ino = inode.gen_no;
+	status->st_blocks = inode.disk_sectors;
 }
 
 uint8_t ext2_probe(ext2_gen_device *dev)

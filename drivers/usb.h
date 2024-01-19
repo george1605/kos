@@ -8,7 +8,7 @@
 
 #define US_URB_ACTIVE	0	
 #define US_SG_ACTIVE	1	
-#define US_ABORTING	2	
+#define US_ABORTING		2	
 #define US_DISCONNECTING	3	
 #define US_RESETTING	4	
 #define US_TIMED_OUT	5	
@@ -63,7 +63,7 @@ void usbattach(struct usbdev u,struct usbdriv* k){
 uint8_t xhciClassCode = PCI_CLASS_SERIAL_BUS;
 uint8_t xhciSubclass = PCI_SUBCLASS_USB;
 uint8_t xhciProgIF = PCI_PROGIF_XHCI;
-size_t xhciBase = pci_baseaddr(0);
+size_t xhciBase = 0;
 
 typedef struct
 {
@@ -195,6 +195,68 @@ size_t xhci_write(struct vfile* node, size_t offset, size_t size, uint8_t * buff
 	return sizeof(struct xhci_trb);
 }
 
+static struct xhcictrlinfo* _irq_owner = (struct xhcictrlinfo*)NULL_PTR;
+static void xhci_irq_handler(struct regs *r) {
+	int irq = r->int_no - 32;
+
+	if (_irq_owner) {
+		uint32_t status = _irq_owner->oregs->op_usbsts;
+		if (status & (1 << 3)) {
+			_irq_owner->oregs->op_usbsts = (1 << 3);
+			uint64_t rts = (uint64_t)_irq_owner->cregs + _irq_owner->cregs->cap_rtsoff;
+			volatile uint32_t * irs0_32 = (uint32_t*)(rts + 0x20);
+			irs0_32[0] |= 1;
+			prswap(_irq_owner->thread);
+			irq_ack(irq);
+		}
+	}
+}
+
+void xhci_thread(void * arg) {
+	struct xhcictrlinfo * controller = (struct xhcictrlinfo*)arg;
+
+	controller->thread = myproc();
+	initlock(&controller->command_queue, (char*)NULL_PTR);
+	uint32_t cmd = controller->oregs->op_usbcmd;
+	cmd &= ~(1);
+	controller->oregs->op_usbcmd = cmd;
+	while (!(controller->oregs->op_usbsts & (1 << 0)));
+
+	cmd = controller->oregs->op_usbcmd;
+	cmd |= (1 << 1);
+	controller->oregs->op_usbcmd = cmd;
+	while ((controller->oregs->op_usbcmd & (1 << 1)));
+	while ((controller->oregs->op_usbsts & (1 << 11)));
+
+	uint64_t ext_off = (controller->cregs->cap_hccparams1 >> 16) << 2;
+
+	volatile uint32_t * ext_caps = (void*)((uint64_t)controller->cregs + ext_off);
+
+	/**
+	 * Verify port configurations;
+	 * should be port 1 is usb 2.0
+	 *           port 2, 3, 4, 5 are 3.0
+	 * port 1 has a hub with 4 ports?
+	 */
+	while (1) {
+		uint32_t cap_val = *ext_caps;
+		/* Bottom byte is type */
+		if ((cap_val & 0xFF) == 2) {
+			uint8_t rev_minor = ext_caps[0] >> 16;
+			uint8_t rev_major = ext_caps[0] >> 24;
+			//uint32_t name_str = ext_caps[1];
+
+			uint8_t port_offset = ext_caps[2];
+			uint8_t port_count  = ext_caps[2] >> 8;
+			uint8_t psic = ext_caps[2] >> 28;
+		}
+
+		if (cap_val == 0xFFFFffff) break;
+		if ((cap_val & 0xFF00) == 0) break;
+		ext_caps = (uint32_t*)((uint64_t)ext_caps + ((cap_val & 0xFF00) >> 6));
+	}
+}
+
 uint64_t find_xhci(uint32_t device, uint16_t v, uint16_t d, void * extra)
 {
   if (pci_find_type(device) != 0x0C03) return;
@@ -225,10 +287,21 @@ uint64_t find_xhci(uint32_t device, uint16_t v, uint16_t d, void * extra)
 	return mmio_addr;
 }
 
+void* xhci_get_vbase()
+{
+	struct pcidev dev;
+	if(xhciBase == 0)
+		xhciBase = pci_baseaddr(0, dev);
+	return vmapx((void*)xhciBase, iomapping(xhciBase), 4096, PAGE_PRESENT | PAGE_WRITABLE, (struct vfile*)NULL_PTR);
+}
+
   int xhcinew()
   {
+	xhcictrlinfo* controller;
     enable_mastering(0, 0, 0);
     enable_interrupt(0, 0, 0);
-    size_t xhciVirtual = (size_t)iomapping((long)xhciBase);
+    size_t xhciVirtual = (size_t)xhci_get_vbase;
     xhci_regs* reg0 = (xhci_regs*)xhciVirtual;
+	size_t irq = pci_get_interrupt(controller->device);
+	irq_install_handler(irq, xhci_irq_handler);
   }

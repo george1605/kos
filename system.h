@@ -160,6 +160,20 @@ __SYSCALL void sys_free(void* ptr)
   prfreeheap(myproc(), ptr); // ARENA ALLOCATOR!
 }
 
+__SYSCALL void sys_setuid(int uid)
+{
+  setuid(uid);
+}
+
+__SYSCALL void sys_userls(int gid, char* list, size_t size)
+{
+  struct group group;
+  struct buf* buffer = kalloc(sizeof(struct buf), KERN_MEM);
+  int fd = prfopen(myproc(), "/home/users", F_READ);
+  group_load(buffer, gid, &group);
+  user_ls(&group, list, size)
+}
+
 #define MAX_SYSCALLS 20
 void* syscalls[MAX_SYSCALLS];
 
