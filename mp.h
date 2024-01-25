@@ -95,7 +95,7 @@ struct mpconf* mpconfig(struct mp **pmp)
   if((mp = mpsearch()) == 0 || mp->physaddr == 0)
     return 0;
   conf = (struct mpconf*)_vm((uint32_t)mp->physaddr);
-  if(memcmp(conf, "PCMP", 4) != 0)
+  if(memncmp(conf, "PCMP", 4) != 0)
     return 0;
   if(conf->version != 1 && conf->version != 4)
     return 0;
@@ -104,6 +104,8 @@ struct mpconf* mpconfig(struct mp **pmp)
   *pmp = mp;
   return conf;
 }
+
+extern void sysc_handler(struct regs* r);
 
 void load_processor_info(void) {
 	unsigned long a, b, unused;
@@ -124,17 +126,15 @@ void load_processor_info(void) {
 		cpuid(0x80000002, brand[0], brand[1], brand[2], brand[3]);
 		cpuid(0x80000003, brand[4], brand[5], brand[6], brand[7]);
 		cpuid(0x80000004, brand[8], brand[9], brand[10], brand[11]);
-		memcpy(processor_local_data[this_core->cpu_id].cpu_model_name, brand, 48);
 	}
 
-	extern void sysc_handler(void);
 	uint32_t efer_hi, efer_lo;
 	asm volatile ("rdmsr" : "=d"(efer_hi), "=a"(efer_lo) : "c"(0xc0000080));    /* Read current EFER */
 	asm volatile ("wrmsr" : : "c"(0xc0000080), "d"(efer_hi), "a"(efer_lo | 1)); /* Enable SYSCALL/SYSRET in EFER, after sw to long mode */
 	asm volatile ("wrmsr" : : "c"(0xC0000081), "d"(0x1b0008), "a"(0));          /* Set segment bases in STAR */
 	asm volatile ("wrmsr" : : "c"(0xC0000082),                                  /* Set SYSCALL entry point in LSTAR */
-	              "d"((uintptr_t)&syscall_entry >> 32),
-	              "a"((uintptr_t)&syscall_entry & 0xFFFFffff));
+	              "d"((uint64_t)&sysc_handler >> 32),
+	              "a"((uint64_t)&sysc_handler & 0xFFFFffff));
 	asm volatile ("wrmsr" : : "c"(0xC0000084), "d"(0), "a"(0x700));             /* SFMASK: Direction flag, interrupt flag, trap flag are all cleared */
 }
 

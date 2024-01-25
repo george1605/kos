@@ -47,3 +47,11 @@ uint8_t gdb_getxmm(struct proc* p, int nr, uint64_t* low, uint64_t* high)
     *low = *(uint64_t*)((char*)p->ctx + offset); // Bro, could do memcpy
     *high = *(uint64_t*)((char*)p->ctx + offset + 8);
 }
+
+void gdb_setxmm(struct proc* p, int nr, uint64_t low, uint64_t high)
+{
+    uint16_t offset = 0xA0 + (0x10 * nr);
+    char* ptr = (char*)p->ctx + offset;
+    *(uint64_t*)ptr = high;
+    *(uint64_t*)(ptr + 8) = low;
+}
