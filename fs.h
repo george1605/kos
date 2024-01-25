@@ -726,23 +726,25 @@ uint8_t fsexist(char *wd, char *fn)
 	return rc;
 }
 
-struct file mkdir(char *dname, struct file *parent)
+void mkdir(char *dname, int perms)
 {
-  struct file _Dir;
-  _Dir.parent = parent;
-  _Dir.name = dname;
-  _Dir.flags = (F_RDWR | F_DIR);
+  if((perms & F_EXEC) && (perms & F_WRITE))
+    perms &= ~F_WRITE; // only can execute
   ext2_touch(dname, fs_dev, (ext2_priv_data*)fs_dev->priv);
-  return _Dir;
+  if(perms != 0x0)
+  {
+    // TO DO!
+  }
 }
 
 void mkfs()
 {
-  struct file *_ROOT = &root;
-  mkdir("/home/lib", _ROOT);
-  mkdir("/home/user", _ROOT);
-  mkdir("/home/bin", _ROOT);
-  mkdir("/home/etc", _ROOT);
+  if(fs_dev->fs->exist("/home/user", fs_dev, fs_dev->priv))
+    return;
+  mkdir("/home/lib", F_WRITE | F_READ);
+  mkdir("/home/user", F_WRITE | F_READ);
+  mkdir("/home/bin", F_READ | F_EXEC);
+  mkdir("/home/etc", F_READ);
   mount("/home/sys", NULL_PTR); // change it later (by default the fs of fs_dev)
 }
 

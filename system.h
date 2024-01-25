@@ -171,7 +171,12 @@ __SYSCALL void sys_userls(int gid, char* list, size_t size)
   struct buf* buffer = kalloc(sizeof(struct buf), KERN_MEM);
   int fd = prfopen(myproc(), "/home/users", F_READ);
   group_load(buffer, gid, &group);
-  user_ls(&group, list, size)
+  user_ls(&group, list, size);
+}
+
+__SYSCALL void sys_ioctl(int fd, size_t cmd, size_t args)
+{
+  ioctl(fd, cmd, args);
 }
 
 #define MAX_SYSCALLS 20
@@ -351,15 +356,10 @@ struct rmentry
   int size;
 };
 
-struct _rmem
-{
-  struct rmentry entries[16];
-  int n;
-} rmtable;
-
 void __SYSCALL sys_prwait(int pid)
 {
-  waitpid(pid); // just as that!
+  int state;
+  waitpid(pid, &state); // just as that!
 }
 
 void __SYSCALL sys_fcall(uint64_t addr, void* _regs) 
@@ -375,11 +375,28 @@ void __SYSCALL sys_fcall(uint64_t addr, void* _regs)
     fcall(addr, u);
 }
 
-void sys_mprotect(void* ptr, size_t size, int prot)
+__SYSCALL void sys_mprotect(void* ptr, size_t size, int prot)
 {
   struct proc* p = myproc();
   pagetable* tbl = (pagetable*)p->stack;
   tlb_flush((uint64_t)tbl);
+}
+
+__SYSCALL void sys_atexit(void(*f)())
+{
+  addexit(myproc(), f); // that should be it...
+}
+
+__SYSCALL void sys_setdisplay(int id, int* last)
+{
+  if(last != NULL_PTR)
+    *last = wmout.scrn->s_fd;
+  wmout.scrn = scrn_req(id);
+}
+
+__SYSCALL struct window* sys_createwin(char* name, int x, int y, int w, int h)
+{
+  return wmout.create(name, x, y, w, h);
 }
 
 void sys_exit(void* arg1)
@@ -398,4 +415,7 @@ void syscinit()
   sysc_add(5, sys_free);
   sysc_add(6, sys_open);
   sysc_add(7, sys_mkdir);
+  sysc_add(8, sys_execv);
+  sysc_add(9, sys_fork);
+  sysc_add(10, sys_ioctl);
 }

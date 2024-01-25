@@ -184,6 +184,20 @@ struct window
   long id;
 };
 
+void DrawChar(char chr, struct fb_font font)
+{
+  fb_write_char(&font, chr, )
+}
+
+void DrawText(char *text, struct fb_font u)
+{
+  int i;
+  for (i = 0; text[i] != 0; i++)
+  {
+    DrawChar(text[i], u);
+  }
+}
+
 struct wm // Window Manager
 {
   char* name;
@@ -308,19 +322,6 @@ void PopBitmap(bitmap* map, void* framebuffer)
     return;
   map->bpp = 4;
   memmove(map->buf, framebuffer, map->width * map->height);
-}
-
-void DrawChar(char chr, struct font u)
-{
-}
-
-void DrawText(char *text, struct font u)
-{
-  int i;
-  for (i = 0; text[i] != 0; i++)
-  {
-    DrawChar(text[i], u);
-  }
 }
 
 void SetWinName(struct window u, const char *name)

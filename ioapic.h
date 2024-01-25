@@ -34,7 +34,7 @@ struct ioapic {
 };
 
 volatile struct ioapic *ioapic;
-volatile size_t *lapic;
+volatile uint32_t *lapic;
 size_t ioapicid;
 
 static size_t ioapicread(int reg)
@@ -57,7 +57,7 @@ void ioapic_init(void)
   maxintr = (ioapicread(REG_VER) >> 16) & 0xFF;
   id = ioapicread(REG_ID) >> 24;
   if(id != ioapicid)
-    kprint("ioapicLAPIC_INIT: id isn't equal to ioapicid!\n");
+    kprint("ioapic: id isn't equal to ioapicid!\n");
 
   for(i = 0; i <= maxintr; i++){
     ioapicwrite(REG_TABLE+2*i, INT_DISABLED | (T_IRQ0 + i));
@@ -90,6 +90,12 @@ static void lapicw(int index, int value)
   (void)lapic[LID];  // wait for write to finish, by reading
 }
 
+void lapic_send_ipi(int i, uint32_t val) {
+	lapicw(0x310, i << 24);
+	lapicw(0x300, val);
+	do { asm volatile ("pause" : : : "memory"); } while (lapic[0x300] & (1 << 12));
+}
+
 void lapic_startup(uint8_t apicid, uint32_t addr)
 {
   int i;
@@ -111,4 +117,14 @@ void lapic_startup(uint8_t apicid, uint32_t addr)
     lapicw(ICRLO, LAPIC_STARTUP | (addr>>12));
     microdelay(200);
   }
+}
+
+void lapic_wakeup()
+{
+  lapic_send_ipi(0, 0x7E | (3 << 18));
+}
+
+void lapic_tlb_shootdown(uint64_t vaddr) {
+  if (!lapic) return;
+  lapic_send_ipi(0, 0x7C | (3 << 18));
 }

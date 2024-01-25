@@ -129,10 +129,10 @@ void gets_stdin(int until)
   {
     keyboard_wait();
     code = inportb(0x60);
-    p->std[0].mem[c] = code;
+    ((char*)p->std[0].mem)[c] = code;
     c++;
   }
-  p->std[0].mem[c] = '\0';
+  ((char*)p->std[0].mem)[c] = '\0';
 }
 
 char *kbdbuf = (char *)(0x2C00FF);
@@ -214,4 +214,22 @@ void keyboard_setled(int ledno)
   while ((inportb(0x64) & 2) != 0)
     ;
   outportb(0x60, ledno);
+}
+
+struct vkbd {
+  size_t id, mapsz;
+  char(*get_key)(struct vkbd*);
+  char map[];
+};
+
+char vkbd_getc(struct vkbd* kbd)
+{
+  if(kbd == NULL_PTR)
+    return '\0';
+  return kbd->map[kbd->get_key(kbd)];
+}
+
+void vkbd_load(char* filename, struct vkbd* kbd)
+{
+  fsread(filename, kbd);
 }

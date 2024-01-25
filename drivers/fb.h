@@ -1,4 +1,5 @@
 // HDMI support
+#pragma once
 #include "ioctl.h"
 #define HDMI_INPUT_8BIT 0
 #define HDMI_INPUT_10BIT 1
@@ -56,7 +57,7 @@ struct fb_cursor_user
 	uint16_t enable;
 	uint16_t rop;
 	const char *mask;
-	struct fbcurpos hot;
+	// struct fbcurpos hot;
 	struct fb_image_user image;
 };
 
@@ -145,6 +146,48 @@ struct fb_rect
 	uint16_t x1, x2, y1, y2;
 };
 
+#define FONT_UTF8 0x1
+#define FONT_UNICODE 0x2
+
+struct fb_font
+{
+	uint16_t std; // UTF-8 or Unicode
+	uint16_t height;
+	uint16_t width;
+	void(*get_char)(struct fb_font* font, uint8_t* buffer, uint16_t c);
+	uint8_t glyph[];
+};
+
+typedef struct {
+    float x, y, z;
+} fb_point3d;
+
+typedef struct {
+    float x, y;
+} fb_point2d;
+
+struct {
+    float focal;
+    float angle;
+} fb_camera;
+
+void fb_project(fb_point3d input, fb_point2d *output, float focalLength) {
+    output->x = (input.x * focalLength) / input.z;
+    output->y = (input.y * focalLength) / input.z;
+}
+
+void fb_rotate(fb_point2d input, fb_point2d* output, float angle) {
+	output->x = input.x * cos(angle) - sin(angle) * input.y;
+	output->y = input.x * sin(angle) + cos(angle) * input.y;
+}
+
+void bitmap_getchar(struct fb_font* font, uint8_t* buffer, uint16_t c)
+{
+	int index = font->height * font->width * (c - 'A');
+	for(int i = 0;i < font->height * font->width;i++)
+		buffer[i] = ((font->glyph[i] == 1) ? 0xffffff : 0x000000);
+}
+
 void fb_clear(uint32_t color)
 {
 	if (fb_info.mem == NULL_PTR)
@@ -210,6 +253,14 @@ void fb_copy(uint32_t *buffer, struct fb_rect info)
 	for (int i = info.x1; i <= info.x2; i++)
 		for (int j = info.y1; j <= info.y2; j++)
 			((uint32_t *)fb_info.mem)[j * width + i] = buffer[j * width + i];
+}
+
+void fb_write_char(struct fb_font* font, uint16_t ch, struct fb_rect rect)
+{
+	if(ch > 0xFF && font->std != FONT_UNICODE) return;
+	uint32_t* buffer = kalloc(font->width * font->height * 4, KERN_MEM);
+	font->get_char(font, buffer, ch);
+	fb_copy(buffer, rect);
 }
 
 inline uint32_t fb_lerp(float f, uint32_t col1, uint32_t col2)

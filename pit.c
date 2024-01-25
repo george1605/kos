@@ -69,6 +69,10 @@ void timer_phase(int hz)
     outportb(0x40, divisor >> 8);     /* Set high byte of divisor */
 }
 
+/*
+ * Does the CS teacher know how scheduling work?
+ * This is basic, I could do something based on priority
+*/
 extern void sched();
 void timer_handler(struct regs *r)
 {

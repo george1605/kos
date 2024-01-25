@@ -15,6 +15,7 @@
 #define _POSIX 3
 #define _ESGUS 1 /* Extended Standard for Graphical Unix Systems */
 #define NCPU 32
+#define PI 3.1415926
 
 #define NORMAL_VGA 0xffff
 #define EXTENDED_VGA 0xfffe
@@ -78,6 +79,11 @@ f64 sin(f64 x)
       : "=t"(result)
       : "0"(x));
   return result;
+}
+
+f64 cos(f64 x)
+{
+  return sin(x + PI / 2);
 }
 #endif
 
@@ -667,7 +673,7 @@ void pwarn(char *text)
 
 // TO DO: Check actual definitions of these macros
 #define va_start(arg, list) list = (va_list)&arg
-#define va_arg(list, type) *(type*)(list); list += sizeof(type)
+#define va_arg(ap, type) (*(type*)((ap += sizeof(type)) - sizeof(type)))
 #define va_end(list) list = (va_list)NULL_PTR
 
 void vsnprintf(char* buf, size_t sz, const char* fmt, va_list args)
@@ -693,8 +699,14 @@ void vsnprintf(char* buf, size_t sz, const char* fmt, va_list args)
         args += sizeof(char*);
         sz -= l;
       break;
+      case 'x':
       case 'p':
         
+      break;
+      case 'c':
+        char c = *args++;
+        *buf++ = c;
+        sz--;
       break;
       }
     } else {

@@ -1,6 +1,7 @@
 #pragma once
 #include "../lib.c"
 #include "../port.h"
+#include "../tty.c"
 //ported from Linux
 typedef uint8_t cc_t;
 
@@ -22,7 +23,10 @@ struct termios2 {
 #define IO_TYPESHIFT 8
 #define IO_SIZESHIFT 16
 #define IO_DIRSHIFT 30
-
+#define _IOC_NRMASK	((1 << 8)-1)
+#define _IOC_TYPEMASK	((1 << 8)-1)
+#define _IOC_SIZEMASK	((1 << 14)-1)
+#define _IOC_DIRMASK	((1 << 2)-1)
 #define IOC(dir,type,nr,size) \
         (((dir)  << IO_DIRSHIFT) | \
         ((type) << IO_TYPESHIFT) | \
@@ -34,6 +38,10 @@ struct termios2 {
 #define IOR(type,nr,size)         IOC(IO_READ,(type),(nr),(IOC_TYPECHECK(size)))
 #define IOW(type,nr,size)         IOC(IO_WRITE,(type),(nr),(IOC_TYPECHECK(size)))
 #define IOWR(type,nr,size)        IOC(IO_READ|IO_WRITE,(type),(nr),(IOC_TYPECHECK(size)))
+#define _IOC_DIR(x) (x >> IO_DIRSHIFT) & _IOC_DIRMASK
+#define _IOC_TYPE(x) (x >> IO_TYPESHIFT) & _IOC_TYPEMASK
+#define _IOC_NR(x) (x >> IO_NRSHIFT) & _IOC_NRMASK
+#define _IOC_SIZE(x) (x >> IO_SIZESHIFT) & _IOC_SIZEMASK
 
 #define TCGETS           0x5401
 #define TCSETS           0x5402
@@ -67,6 +75,13 @@ struct termios2 {
 #define TCSETS2          IOW('T', 0x2B, struct termios2)
 #define TCSETSW2         IOW('T', 0x2C, struct termios2)
 #define TCSETSF2         IOW('T', 0x2D, struct termios2)
+
+#define DEVGETC          IOR('D', 0x01, uint8_t) /* Generic Device IOCTL - Used by Kernel */
+#define DEVSETC          IOW('D', 0x02, uint8_t)
+#define DEVRESET         IOW('D', 0x03, uint8_t)
+#define DEVSETIRQ        IOW('D', 0x04, void*)
+#define DEVINIT          IOW('D', 0x05, uint8_t)
+#define DEVSTAT          IOR('D', 0x06, struct stat*)
 
 #define KEY_SEND	 231	
 #define KEY_REPLY	 232	
@@ -104,3 +119,129 @@ struct inputhnd {
   const char *name;
   void *private;
 };
+
+#define BUS_PCI 0x1
+#define BUS_DMA 0x2 
+#define BUS_USB 0x4 // usb keyboard, mouse etc.
+#define BUS_IO  0x8 // io ports
+
+struct deviceinfo {
+  int type; // char or block
+  size_t blocksize; // for block devs
+  int irq_no; // irq number (if needed)
+  int bus_type;
+  size_t bus_num;
+};
+
+int map_device(int fd, ext2_gen_device* device)
+{
+  struct proc* p = myproc();
+  fd = fdremap(fd, p->ofiles);
+  if(p->ofiles[fd].extra != NULL_PTR)
+    return -1; // already been used!
+  memcpy(p->ofiles[fd].extra, device, sizeof(ext2_gen_device));
+  p->ofiles[fd].flags = F_DEV;
+  return fd;
+}
+
+void find_device(int fd, ext2_gen_device* device)
+{
+  struct proc* p = myproc();
+  memcpy(device, p->ofiles[fd].extra, sizeof(ext2_gen_device));
+}
+
+int is_device(int fd)
+{
+  struct proc* p = myproc();
+  return p->ofiles[fd].flags & F_DEV;
+}
+
+static void dev_setup_pci(ext2_gen_device* dev, uint32_t device)
+{
+  dev->priv = kalloc(sizeof(struct deviceinfo), KERN_MEM);
+  struct deviceinfo* info = dev->priv;
+  info->irq_no = pci_get_interrupt(device);
+  info->bus_num = device;
+  info->type = INODE_TYPE_CHAR_DEV;
+  info->bus_type = BUS_PCI;
+}
+
+static void dev_setup_io(ext2_gen_device* dev, uint16_t port)
+{
+  dev->priv = kalloc(sizeof(struct deviceinfo), KERN_MEM);
+  struct deviceinfo* info = dev->priv;
+  info->irq_no = 32;
+  info->bus_num = port;
+  info->type = INODE_TYPE_CHAR_DEV;
+  info->bus_type = BUS_IO;
+}
+
+void dev_free(ext2_gen_device* dev)
+{
+  free(dev->priv);
+}
+
+static uint8_t dev_getc(int fd)
+{
+  char charb[2]; // for safety measures
+  ext2_gen_device device;
+  find_device(fd, &device);
+  device.read(charb, device.offset, 1, &device);
+  return charb[0]; 
+}
+
+static void dev_putc(int fd, uint8_t chars)
+{
+  ext2_gen_device device;
+  find_device(fd, &device);
+  char charp[2] = {chars, 0};
+  device.write(charp, device.offset++, 1, &device);
+}
+
+static void dev_set_irq(int fd, void(*func)(struct regs*))
+{
+  ext2_gen_device device;
+  find_device(fd, &device);
+  struct deviceinfo* info = (struct deviceinfo*)device.priv;
+  irq_install_handler(info->irq_no, func);
+}
+
+static void dev_stat(int fd, struct stat* stat)
+{
+  ext2_gen_device device;
+  find_device(fd, &device);
+  struct deviceinfo* info = device.priv;
+  stat->st_dev = device.dev_no;
+  stat->st_blksize = info->blocksize;
+  stat->st_blocks = 0;
+}
+
+static void dev_ctl(int fd, size_t cmd, size_t args)
+{
+  switch(cmd)
+  {
+  case DEVGETC:
+    *(uint8_t*)args = dev_getc(fd);
+  case DEVSETC:
+    dev_putc(fd, args & 0xff);
+  case DEVSETIRQ:
+    dev_set_irq(fd, (void*)args);
+  case DEVSTAT:
+    dev_stat(fd, (struct stat*)args);
+  }
+}
+
+struct _ioctl {
+  char id; // 'T', 'X' etc.
+  void(*iof)(int fd, size_t cmd, size_t arg);
+  struct _ioctl* next, *prev; 
+} ioctlmap;
+
+void ioctl(int fd, size_t cmd, size_t arg)
+{
+  if(is_tty(fd))
+    ttyctl(fd - TTYBASE, cmd - 0x5400);
+
+  if(is_device(fd) && _IOC_TYPE(cmd) == 'D')
+    dev_ctl(fd, cmd, arg);
+}

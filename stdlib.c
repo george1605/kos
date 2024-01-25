@@ -31,6 +31,12 @@ FILE stdfiles[3];
 #define stdout &stdfiles[1]
 #define stderr &stdfiles[2]
 
+struct __pthread {
+	int tid;
+	void* (*entry)(void*);
+	void* arg;
+};
+
 time_t time(time_t* time){
   if(time == NULL)
     return userm_time();
@@ -41,8 +47,6 @@ time_t time(time_t* time){
 }
 
 void* malloc(size_t bytes){
-  if(bytes > 0x100000)
-    return _vm(0xFF00);
   return userm_malloc(bytes);
 }
 
@@ -51,9 +55,26 @@ char to_upper(char u){
     return (char)(u + 32);
 }
 
-void* calloc(int x, int y)
+void* calloc(size_t x, size_t y)
 {
-  return alloc(0, x * y); 
+  void* p = malloc(x * y);
+  memset(p, 0, x * y);
+  return p;
+}
+
+void mkdir(char* dir)
+{
+  userm_mkdir(dir);
+}
+
+int fork()
+{
+  return userm_fork();
+}
+
+void exit(int code)
+{
+  userm_exit(code); // from here we are no more
 }
 
 char to_lower(char u){

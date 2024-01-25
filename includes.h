@@ -75,7 +75,7 @@ void switch_long_mode() {
 
     asm volatile(
         "mov $1f, %0 \n\t"  
-        "ljmp $0x8, %0 \n\t" 
+        "ljmp $0x8, $0x0 \n\t" 
         "1:"
         :
         : "m"(0x1000)

@@ -51,9 +51,9 @@ struct buf *shlget(shl x)
 {
 	int a;
 	struct buf *u = TALLOC(struct buf);
-	u.flags |= B_DIRTY;
+	u->flags |= B_DIRTY;
 	memcpy(u->data, x.info, 12);
-	x->data[13] = x.flags;
+	x.data[13] = x.flags;
 	return u;
 }
 

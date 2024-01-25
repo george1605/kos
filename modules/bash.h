@@ -107,10 +107,18 @@ void shell_main(int argc, char** argv)
   klog(cns, "Bash Shell\n");
   klog(cns, "$ ");
   int exit = 0; // if exited
+  char* buffer;
   while(!exit)
   {
     buffer = getl();
     argexec(argc, argv);
   }
-  
+  free(buffer); // we need to free the buffer
+}
+
+void shell_as_start()
+{
+  kprint("Setting up the shell...\n");
+  struct proc* p = prnew_k("shell", 64 * 1024);
+  schedinit(p); 
 }

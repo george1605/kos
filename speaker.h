@@ -17,7 +17,7 @@ struct snddev
     size_t playback_format;
 };
 
-void wait(int count)
+void sp_wait(int count)
 {
     unsigned long wait_till;
     wait_till = timer_ticks + count;
@@ -41,8 +41,7 @@ void speaker_play(size_t hz)
 
 void speaker_tone()
 {
-    outb(0x43, TIMER2_SELECT | WRITE_WORD | MODE_SQUARE_WAVE);
-    
+    outb(0x43, TIMER2_SELECT | WRITE_WORD | MODE_SQUARE_WAVE);   
 }
 
 void speaker_pause()

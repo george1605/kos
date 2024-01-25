@@ -1,6 +1,7 @@
 #pragma once
 #include "port.h"
 #include "ioapic.h"
+#include "cpuem.h"
 #define MPPROC    0x00
 #define MPBUS     0x01
 #define MPIOAPIC  0x02
@@ -104,6 +105,39 @@ struct mpconf* mpconfig(struct mp **pmp)
   return conf;
 }
 
+void load_processor_info(void) {
+	unsigned long a, b, unused;
+	cpuid(0,unused,b,unused,unused);
+
+	struct cpu* cpu = mycpu();
+
+	if (b == 0x756e6547) {
+		cpuid(1, a, b, unused, unused);
+    printf("Intel CPU %i, Model %i, Family %i.\n", cpu->apicid, (a >> 4) & 0x0F, (a >> 8) & 0x0F);
+	} else if (b == 0x68747541) {
+		cpuid(1, a, unused, unused, unused);
+	}
+	/* See if we can get a long manufacturer strings */
+	cpuid(0x80000000, a, unused, unused, unused);
+  uint32_t brand[12];
+	if (a >= 0x80000004) {
+		cpuid(0x80000002, brand[0], brand[1], brand[2], brand[3]);
+		cpuid(0x80000003, brand[4], brand[5], brand[6], brand[7]);
+		cpuid(0x80000004, brand[8], brand[9], brand[10], brand[11]);
+		memcpy(processor_local_data[this_core->cpu_id].cpu_model_name, brand, 48);
+	}
+
+	extern void sysc_handler(void);
+	uint32_t efer_hi, efer_lo;
+	asm volatile ("rdmsr" : "=d"(efer_hi), "=a"(efer_lo) : "c"(0xc0000080));    /* Read current EFER */
+	asm volatile ("wrmsr" : : "c"(0xc0000080), "d"(efer_hi), "a"(efer_lo | 1)); /* Enable SYSCALL/SYSRET in EFER, after sw to long mode */
+	asm volatile ("wrmsr" : : "c"(0xC0000081), "d"(0x1b0008), "a"(0));          /* Set segment bases in STAR */
+	asm volatile ("wrmsr" : : "c"(0xC0000082),                                  /* Set SYSCALL entry point in LSTAR */
+	              "d"((uintptr_t)&syscall_entry >> 32),
+	              "a"((uintptr_t)&syscall_entry & 0xFFFFffff));
+	asm volatile ("wrmsr" : : "c"(0xC0000084), "d"(0), "a"(0x700));             /* SFMASK: Direction flag, interrupt flag, trap flag are all cleared */
+}
+
 int ncpu;
 void mpinit(){
   uint8_t *p, *e;
@@ -149,4 +183,5 @@ void mpinit(){
     outb(0x22, 0x70);   // Select IMCR
     outb(0x23, inb(0x23) | 1);
   }
+  load_processor_info();
 }

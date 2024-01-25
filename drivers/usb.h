@@ -230,7 +230,7 @@ void xhci_thread(void * arg) {
 
 	uint64_t ext_off = (controller->cregs->cap_hccparams1 >> 16) << 2;
 
-	volatile uint32_t * ext_caps = (void*)((uint64_t)controller->cregs + ext_off);
+	volatile uint32_t * ext_caps = (uint32_t*)((uint64_t)controller->cregs + ext_off);
 
 	/**
 	 * Verify port configurations;

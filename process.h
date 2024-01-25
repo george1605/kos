@@ -47,7 +47,7 @@ struct proc
   int ssize;
   func f;
   struct file* ofiles;
-} tproc, kproc;
+} tproc, kproc, *idle_task = NULL_PTR;
 
 void praddvfile(struct proc* p, struct vfile* vf)
 {
@@ -77,12 +77,12 @@ struct prset
   struct spinlock lock;
 } prlist;
 
-void prappend(struct proc u)
+void prappend(struct proc p)
 {
-  while(prlist.lock.locked)
-    NOP();
   acquire(&prlist.lock);
-  prlist.procs[++prlist.cnt] = u;
+  prlist.rear = (prlist.rear + 1) % prlist.cnt;
+  prlist.procs[prlist.rear] = p;
+  prlist.size++;
   release(&prlist.lock);
 }
 
@@ -100,17 +100,23 @@ int fdremap(int fd, struct file* ofiles)
 void sched()
 {
   int ffront = prlist.front;
+  if(prlist.size == 0)
+    prswap(idle_task);
+  acquire(&prlist.lock);
   struct proc p = prlist.procs[ffront];
   prlist.front = (prlist.front + 1) % prlist.cnt;
   prlist.size--;
+  release();
   prswap(&prlist.procs[ffront]);
   delay(5000); // <-- this corresponds to the time frame for each process
   prswap(&tproc);
   if(prlist.procs[ffront].state != KILLED)
   {
+    acquire(&prlsit.lock);
     prlist.rear = (prlist.rear + 1) % prlist.cnt;
     prlist.procs[prlist.rear] = p;
     prlist.size++;
+    release(&prlist.lock);
   }
 }
 
@@ -122,6 +128,7 @@ struct proc* prnew_k(char* name, int memSize)
   p.ssize = memSize;
   p.pid = ++lpid;
   p.parent = &tproc;
+  prsetupvm(&p);
   prappend(p);
   sched();
   return &prlist.procs[prlist.cnt];
@@ -368,6 +375,7 @@ void prswap(struct proc* u)
   char** argv = (char**)kalloc(2 * sizeof(char*), USER_MEM);
   argv[0] = u->name;
   argv[1] = (char*)NULL_PTR;
+  lapic_wakeup();
   u->f(1, argv);
 }
 
@@ -653,13 +661,14 @@ void envget(struct environ* u, char* key, char** out)
   *out = (char*)NULL_PTR; // not found :(
 }
 
-void envfsread(struct environ* environ, char* fname)
+void envfsread(struct environ* environ, char* fname, char* buffer)
 {
-  char* out, *buffer;
+  char* out = (char*)NULL_PTR;
   envget(environ, "PATH", &out);
   strcat(buffer, out);
   strcat(buffer, fname);
-  fsread(fname, );
+  fsread(fname, buffer);
+  free(out);
 }
 
 void envpush(struct environ *u)
@@ -703,52 +712,51 @@ void envrstor()
   fxrestor(NULL_PTR);
 }
 
-struct isolate
+struct proc* prspawn_idle(int msize)
 {
-  char *stack;
-  int files[8];
-  int fcnt;
-  int (*handler)(int);
-};
-
-struct isolate islcreat(int (*x)(int))
-{
-  struct isolate u;
-  u.fcnt = 0;
-  u.stack = kalloc(128, USER_MEM);
-  memset(u.files, 0, 8);
-  u.handler = x;
-  return u;
-}
-
-int __isldef(int code)
-{
-  char *stk;
-  if (code != 0)
-  {
-    stk = ((struct isolate *)code)->stack;
-    *(stk + 1) = 0;
-  }
-  return 0;
-}
-
-struct isolate islcreatx(int (*x)(int), size_t ssize)
-{
-  struct isolate u;
-  u.stack = kalloc(ssize, USER_MEM);
-  memset(u.files, 0, 8);
-  u.handler = x;
-  return u;
-}
-
-int islrun(struct isolate i)
-{
-  if (i.stack == 0)
-    i.stack = kalloc(128, USER_MEM);
-
-  int p = i.handler((int)&i);
-  free(i.stack);
+  struct proc* p = kalloc(sizeof(struct proc), KERN_MEM);
+  p->stack = kalloc(size);
+  p->f = NULL_PTR;
+  p->state = PAUSED;
+  p->name = strdup("[idle]");
+  prsetupvm(p);
   return p;
+}
+
+
+#define STACK_GROW 1
+#define HEAP_GROW 2
+
+/*
+  * Needed to transform an idle task -> running process
+*/
+void prgrow(struct proc* p, size_t size, int type)
+{
+  if(size < p->ssize) return;
+  if(type == STACK_GROW)
+  {
+    void* m = kalloc(size, KERN_MEM);
+    memcpy(m, p->stack, p->ssize);
+    free(p->stack);
+    p->stack = m;
+  } else {
+    arena* ar = *(arena**)(p->stack + sizeof(struct pagetable));
+    arena_grow(ar, size); 
+  }
+}
+
+/*
+ * Use the Idle Task 
+*/
+void prswtch_idle(func f)
+{
+  struct proc* p = idle_task;
+  p->f = f;
+  p->state = STARTED;
+  prappend(*p);
+  free(p);
+  sched();
+  idle_task = prspawn_idle(1024);
 }
 
 struct atomic

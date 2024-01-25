@@ -46,7 +46,7 @@ struct thread thcreat(struct proc* parent,int sstack){
   u.tid = parent->pid + 1;
   u.state = STARTED;
   u.stack = parent->stack;
-  if(sstack < parent.ssize)
+  if(sstack < parent->ssize)
     u.ssize = sstack;
   else   
     u.ssize = parent->ssize;
@@ -57,7 +57,7 @@ void thpause(struct thread t){
   t.state = PAUSED;
 }
 
-void thrun(struct thread k){
+void thrun(struct thread t){
   t.state = STARTED;
   t.f(0,(char**)0);
 }

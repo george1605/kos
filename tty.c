@@ -1,7 +1,6 @@
 #pragma once
 #include "mem.h"
 #include "lib.c"
-#include "drivers/ioctl.h"
 #include "vfs.h"
 #include "fs.h"
 #define TTYBASE 0xBB00
@@ -53,6 +52,13 @@ int ttyinit(size_t num)
   initlock(&u.lock, NULL_PTR);
   ttys[num] = u;
   return 0;
+}
+
+int is_tty(int fd)
+{
+  if(fd < TTYBASE || fd > TTYBASE + MAXTTY)
+    return 0;
+  return (ttys[fd - TTYBASE].getc != NULL_PTR); // if registered function
 }
 
 struct ttydev ttyopen_k(size_t num)
