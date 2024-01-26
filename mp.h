@@ -183,5 +183,4 @@ void mpinit(){
     outb(0x22, 0x70);   // Select IMCR
     outb(0x23, inb(0x23) | 1);
   }
-  load_processor_info();
 }

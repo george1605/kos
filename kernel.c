@@ -13,7 +13,8 @@ void kernel_main(){
   kernel_setup(0);
   cmdexec(gets(32));
   while(1){
-    if(glsig == SHUTDOWN || glsig == RESTART)
+    if(glsig == RESTART)
+      acpi_reset();
       break;
   }
   kernel_close();

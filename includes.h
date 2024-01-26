@@ -39,21 +39,6 @@ void sendferr(int code)
   glsig = code | 0x10;
 }
 
-void islfadd(struct isolate u, int fd)
-{
-  u.fcnt++;
-  u.files[u.fcnt] = fd;
-}
-
-struct vfile islmap(struct isolate isl)
-{
-  struct vfile u;
-  u.mem = (void *)(&isl);
-  u.status = 0x4;
-  u.fd = 0;
-  return u;
-}
-
 void envwrite(struct environ *v) // writes the environ variables
 {
   if (v == NULL_PTR)
@@ -102,6 +87,7 @@ void init()
   dsp_init();
   switch_long_mode();
   syscinit();
+  load_processor_info(); // load info and set up SYSCALL instr handler
   kprint("x64 Mode Activated. (Respect +)");
   fs_init();
   vfsinit();

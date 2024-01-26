@@ -103,7 +103,9 @@ void at_exit()
 void shell_main(int argc, char** argv)
 {
   struct console* cns = alloc_console();
-  kclear_console(myproc());
+  struct proc* pr = myproc();
+  kclear_console(pr);
+  addexit(pr, at_exit);
   klog(cns, "Bash Shell\n");
   klog(cns, "$ ");
   int exit = 0; // if exited
@@ -114,6 +116,7 @@ void shell_main(int argc, char** argv)
     argexec(argc, argv);
   }
   free(buffer); // we need to free the buffer
+  kprexit(pr, 0);
 }
 
 void shell_as_start()

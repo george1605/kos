@@ -54,6 +54,7 @@ uint8_t mouse_read() {
 	return t;
 }
 
+extern void desktop_trigger_mouse(int x, int y);
 void mouse_handler(struct regs* r){
 	size_t mouse_cycle = 0;
 	size_t mouse_bytes[3];
@@ -96,7 +97,7 @@ void mouse_handler(struct regs* r){
 		if (mouse_y < 0)
 			mouse_y = 0;
 	}
-
+	desktop_trigger_mouse(mouse_x, mouse_y);
 }
 
 void mouse_install() {
