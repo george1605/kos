@@ -396,6 +396,41 @@ void mem_unmap(pagetable* table)
   STI();
 }
 
+/*
+ * Linux kernel function, using get_phys to get physical page
+ * and memcpy to copy to kernel address
+*/
+#define MEM_SET_DEFAULT 0x0
+#define MEM_MAKE_ALIGNED 0x1
+#define MEM_CHECK_VPTR 0x2
+
+void copy_from_user(char* kptr, const void* uptr, size_t size)
+{
+  void* phys = get_phys(uptr);
+  if(phys == NULL_PTR)
+    return;
+
+  memcpy(kptr, phys, size);
+}
+
+void copy_from_user_align(char* kptr, const void* uptr, size_t size, uint16_t align)
+{
+  if(size == 0) return;
+  size = size - size % align + align;
+  copy_from_user(kptr, uptr, size);
+}
+
+/*
+ * This can be used for kernel modules
+*/
+#define KERN_START_ADDR 0x100000
+
+void copy_into_kernel(uint32_t offset, const void* ptr, size_t size)
+{
+  void* kptr = (void*)(KERN_MEM + offset);
+  copy_from_user(kptr, ptr, size);
+}
+
 typedef struct {
   void* ptr;
   size_t size;

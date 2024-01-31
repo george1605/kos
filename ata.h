@@ -2,6 +2,7 @@
 #include "lib.c"
 #include "pci.h"
 #include "dma.h"
+#include "modules/test.h"
 #define ATA_DMA_BOUNDARY 0xffffUL
 #define ATA_DMA_MASK 0xffffffffULL
 #define ATA_SR_BSY 0x80
@@ -418,6 +419,13 @@ typedef struct {
   uint32_t sector_count;
 } mbr_partition;
 
+typedef struct {
+  uint16_t drive_no;
+  uint32_t start_lba;
+  uint32_t end_lba;
+  uint16_t flags;
+} fs_partition;
+
 void ata_open_disk(uint32_t disk, uint8_t partition, mbr_partition *out) {
   disk = disk; // future plans
   uint8_t *raw = (uint8_t*)kalloc(SECTOR_SIZE, KERN_MEM);
@@ -425,4 +433,17 @@ void ata_open_disk(uint32_t disk, uint8_t partition, mbr_partition *out) {
   ata_kread_sector((char*)raw, tdev, 0x0);
   *out = *(mbr_partition*)(&raw[mbr_partitions[partition]]);
   free(raw);
+}
+
+inline uint8_t ata_is_ext2(mbr_partition *out) {
+    return out->type == 0x83;
+}
+
+size_t ata_partition_size(fs_partition* fspart) {
+    return (fspart->end_lba - fspart->start_lba) * SECTOR_SIZE;
+}
+
+void ata_partition_split(fs_partition in, size_t offset, fs_partition* out[2])
+{
+
 }

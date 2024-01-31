@@ -3,10 +3,12 @@
 #include "lib.c"
 #include "screen.h"
 #include "gui.c"
+#include "drivers/fb.h"
 #define C_CNT 16
 #define CONSOLE_TTY 1
 #define CONSOLE_GRAPHIC 2
-#define CONSOLE_BASIC 3
+#define CONSOLE_BASIC 4
+#define CONSOLE_FILE 8 // just logs to a file
 
 struct console 
 {
@@ -14,6 +16,7 @@ struct console
     int x, y; // cursor position
     char crs[C_CNT];
     int fd, flags;
+    struct fb_font font;
 } dbg_console;
 
 // handle special chars
@@ -80,6 +83,19 @@ void kdettach_console(struct proc* p)
     free(p->std[1].mem);
 }
 
+struct console* file_console(char* filename)
+{
+    int fd = user_fsopen(filename, F_READ);
+    struct console* cns = (struct console*)kalloc(sizeof(struct console), KERN_MEM);
+    cns->fd = fd;
+    cns->x = cns->y = 0;
+    struct stat stat;
+    ext2_stat(filename, &stat, fs_dev, fs_dev->priv);
+    cns->w = stat.st_size;
+    cns->h = 1;
+    return cns;
+}
+
 struct console* alloc_console()
 {
     struct console* cons = knew_console();
@@ -89,7 +105,23 @@ struct console* alloc_console()
 
 void kdisp_text(struct console* cns, char* msg)
 {
-     
+    struct fb_rect rect;
+    rect.x1 = cns->x;
+    rect.y1 = cns->y;
+    rect.x2 = cns->x + cns->font.width;
+    rect.y2 = cns->y + cns->font.height;
+    while(*msg)
+    {
+        // kspec_char() - supports only text mode
+        fb_write_char(font, *msg++, rect);
+        rect.x1 = rect.x2 + 1;
+        rect.x2 += cns->font.width;
+        if(rect.x1 > fb_info.res_x)
+        {
+            rect.x1 = 0;
+            rect.y1 += cns->font.height + 1;
+        }
+    }
 }
 
 void klog(struct console* cns, char* msg)
@@ -101,6 +133,19 @@ void klog(struct console* cns, char* msg)
     } else {
         movecr(cns->x, cns->y); // move the cursor to the position
         kprint(msg); // standard vga text mode
+    }
+}
+
+void kunput(struct console* cns)
+{
+    if(cns->flags & CONSOLE_BASIC) {
+        if(cns->x == 0)
+            cns->x = 25, cns->y--;
+        else
+            cns->x--;
+        kersc();
+    } else if(cns->flags & CONSOLE_GRAPHIC) {
+        
     }
 }
 

@@ -1,5 +1,7 @@
 #include "lib.c"
-#include "isr.h"
+#include "isr.c"
+#include "irq.c"
+
 #define KEY_PORT 0x60
 void keyboard_handler(struct regs *r)
 {

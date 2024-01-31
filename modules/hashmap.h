@@ -120,7 +120,7 @@ void * hashmap_remove(struct hashtable * map, const void * key) {
 int hashmap_has(struct hashtable* map, const void * key) {
 	unsigned int hash = hashmap_string_hash(key) % map->size;
 
-	hash_entry_t * x = map->array[hash];
+	hashmap_entry_t * x = map->array[hash];
 	if (!x) {
 		return 0;
 	} else {

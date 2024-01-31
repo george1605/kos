@@ -19,7 +19,7 @@
  #define __WINC__ 2
 #endif
 #define STD_API(a) a
-typedef unsinged int COLORREF;
+typedef unsigned int COLORREF;
 #define RGB(_r,_g,_b) (COLORREF)((_r) | (_g << 8) | (_b << 16))
 
 typedef char BYTE;
@@ -143,7 +143,7 @@ HANDLE NtCreateFile()
 
 void DbgPrint(const char* string)
 {
-    kprint(string);
+    kprint((char*)string);
 }
 
 HANDLE CreateThread(SIZE_T StackSize,LPTHREAD_START_ROUTINE lpStartAddress)
@@ -155,7 +155,7 @@ HANDLE CreateThread(SIZE_T StackSize,LPTHREAD_START_ROUTINE lpStartAddress)
 
 HANDLE CreateProcess(LPCSTR name, SIZE_T size)
 {
-  return (HANDLE)prnew_k(name, size);
+  return (HANDLE)prnew_k((char*)name, size);
 }
 
 void ExitThread(DWORD swExitCode)

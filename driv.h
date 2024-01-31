@@ -147,8 +147,18 @@ void drivexit()
 
 struct vfile* drivasfile(drivobj obj)
 {
-  struct vfile* vf = kalloc(sizeof(struct vfile));
+  struct vfile* vf = (struct vfile*)kalloc(sizeof(struct vfile), KERN_MEM);
   vf->name = obj.name;
   vf->fd = fdalloc();
   return vf; 
+}
+
+void driv_load(drivobj* obj, const void* code, size_t size)
+{
+  if(obj == NULL_PTR)
+    return;
+
+  ElfHeader* hdr = (ElfHeader*)kalloc(sizeof(ElfHeader), KERN_MEM);
+  copy_from_user((char*)hdr, code, size);
+  obj->init = (void(*)())hdr->e_entry;
 }

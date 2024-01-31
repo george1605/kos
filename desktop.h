@@ -7,11 +7,12 @@
 struct {
   struct window* windows[MAX_WINDOWS];
   void(*arange)();
+  struct cursor crs; // the cursor
 } desktop;
 
 void desktop_show(int wid)
 {
-  desktop.windows[wid].active = 1;
+  desktop.windows[wid]->active = 1;
   wmout.show(desktop.windows[wid]);
   desktop.arange();
 }
@@ -26,9 +27,24 @@ int desktop_alloc(struct window* win)
   }
 }
 
+int desktop_create(char* name, int x, int y, int w, int h)
+{
+  struct window* win = wmout.create(name, x, y, w, h);
+  int wid = desktop_alloc(win); // find an appropiate ID
+  desktop_show(wid);
+  desktop.arange();
+  return wid;
+}
+
 int desktop_is_active(int wid)
 {
   return desktop.windows[wid]->active == 1;
+}
+
+void desktop_hide(int id)
+{
+  wmout.hide(desktop.windows[id]);
+  desktop.windows[id]->active = 0;
 }
 
 void desktop_set_main(struct window* win)
@@ -56,11 +72,16 @@ void desktop_remove(int wid)
   desktop.arange();
 }
 
-// give the desktop control to user
+// to update to fb_copy_alpha and create such fn
+// so the bkg doesn't get changed
 void desktop_trigger_mouse(int x, int y)
 {
-  if(x > 10 && y < 100)
-    desktop_trigger();
+  struct fb_rect info;
+  info.x1 = x;
+  info.x2 = x + desktop.crs.image->width;
+  info.y1 = y;
+  info.y2 = y + desktop.crs.image->height;
+  fb_copy(desktop.crs.image->buf, info);
 }
 
 void desktop_at_exit()

@@ -10,3 +10,10 @@ size_t switch_endian32(size_t nb) {
               ((nb>>8)&0xff00)     |
               ((nb<<24)&0xff000000);
 }
+
+int check_endian()
+{
+       uint32_t endcheck = 0x12121224;
+       uint8_t endbyte = *((uint8_t *)&endcheck);
+       return (endbyte == 0x12);
+}

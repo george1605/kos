@@ -622,10 +622,7 @@ void kprintint(int n)
 void kprint(char *text)
 {
   while (*text)
-  {
-    *BUFFER++ = *text++;
-    *BUFFER++ = 0xF;
-  }
+    putch(*text++);
 }
 
 void printint(int xx, int base, int sign)
