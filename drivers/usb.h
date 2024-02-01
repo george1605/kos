@@ -255,6 +255,115 @@ void xhci_thread(void * arg) {
 		if ((cap_val & 0xFF00) == 0) break;
 		ext_caps = (uint32_t*)((uint64_t)ext_caps + ((cap_val & 0xFF00) >> 6));
 	}
+
+	uint64_t dcbaap = (uint64_t)kalloc(4096, KERN_MEM);
+	uint64_t * baseCtx = (uint64_t*)vmap((void*)dcbaap, 4096, PAGE_PRESENT | PAGE_WRITABLE, (struct vfile*)NULL_PTR);
+
+	printf("xhci: DCBAAP at %x (phys=%x)\n", (uint64_t)baseCtx, dcbaap);
+	controller->oregs->op_dcbaap[0] = controller->pcie_offset + dcbaap;
+	controller->oregs->op_dcbaap[1] = (controller->pcie_offset + dcbaap) >> 32;
+
+	/* Enable slots */
+	uint32_t cfg = controller->oregs->op_config;
+	cfg &= ~0xFF;
+	cfg |= 32;
+	printf("xhci: set cfg = %#x\n", cfg);
+	controller->oregs->op_config = cfg;
+
+	/* trbs for event ring */
+	uint64_t er_trbs_phys;
+	void * er_trbs_virt = (void*)allocate_page(&er_trbs_phys);
+	printf("xhci: er trbs = %#zx (phys=%#zx)\n",
+		(uint64_t)er_trbs_virt, er_trbs_phys);
+
+	/* erst */
+	uint64_t er_erst_phys;
+	void * er_erst_virt = (void*)allocate_page(&er_erst_phys);
+	printf("xhci: er erst = %x (phys=%x)\n",
+		(uint64_t)er_erst_virt, er_erst_phys);
+
+	((volatile uint64_t*)er_erst_virt)[0] = controller->pcie_offset + er_trbs_phys;
+	((volatile uint64_t*)er_erst_virt)[1] = 64;
+
+	printf("xhci: rtsoff = %x\n", controller->cregs->cap_rtsoff);
+	uint64_t rts = (uint64_t)controller->cregs + controller->cregs->cap_rtsoff;
+
+	/* Interrupter points to event ring */
+	volatile uint32_t * irs0_32 = (uint32_t*)(rts + 0x20);
+	irs0_32[2] = 1; /* Size = 1 */
+	irs0_32[6] = (controller->pcie_offset + er_trbs_phys) | (1 << 3);
+	irs0_32[7] = (controller->pcie_offset + er_trbs_phys) | (1 << 3) >> 32;
+	irs0_32[1] = 500; /* IMOD */
+	irs0_32[0] = 2; /* enable interrupts */
+	irs0_32[4] = controller->pcie_offset + er_erst_phys;
+	irs0_32[5] = (controller->pcie_offset + er_erst_phys) >> 32;
+
+	/* trbs for control ring */
+	uint64_t cr_trbs_phys;
+	void * cr_trbs_virt = (void*)allocate_page(&cr_trbs_phys);
+
+	((volatile uint64_t*)cr_trbs_virt)[63 * 2] = controller->pcie_offset + cr_trbs_phys;
+	((volatile uint64_t*)cr_trbs_virt)[63 * 2 + 1] = ((0x2UL | (6UL << 10)) << 32);
+
+	controller->oregs->op_crcr[0] = (controller->pcie_offset + cr_trbs_phys) | 1;
+	controller->oregs->op_crcr[1] = ((controller->pcie_offset + cr_trbs_phys) | 1) >> 32;
+
+	/* Scratchpad buffers, if needed */
+	uint32_t hcs2 = controller->cregs->cap_hcsparams2;
+	uint32_t sb_hi = (hcs2 >> 21) & 0x1f;
+	uint32_t sb_lo = (hcs2 >> 27) & 0x1f;
+	uint32_t sb_max = (sb_hi << 5) | sb_lo;
+
+	/* should be 31 */
+	if (sb_max) {
+		printf("num scratchpad buffers = %u\n", sb_max);
+
+		/* Allocate buffer for array */
+		uint64_t scratch_phys;
+		uint64_t *scratch_virt = (uint64_t*)allocate_page(&scratch_phys);
+		printf("xhci: scratch at %x (phys=%x)\n", (uint64_t)scratch_virt, scratch_phys);
+		for (unsigned int i = 0; i < sb_max; ++i) {
+			uint64_t sb_phys;
+			allocate_page(&sb_phys);
+			scratch_virt[i] = controller->pcie_offset + sb_phys;
+		}
+		baseCtx[0] = controller->pcie_offset + scratch_phys;
+		printf("xhci: assigned scratchpad buffer array\n");
+	}
+
+	/* TODO This irq API sucks */
+	int irq_number = pci_get_interrupt(controller->device);
+	irq_install_handler(irq_number, irq_handler);
+	_irq_owner = controller;
+
+	printf("xhci: Starting command ring...\n");
+	{
+		uint32_t cmd = controller->oregs->op_usbcmd;
+		printf("cmd before = %x\n", cmd);
+		cmd |= (1 << 0) | (1 << 2);
+		controller->oregs->op_usbcmd = cmd;
+	}
+
+	delay(50000);
+
+	printf("xhci: status = %#x\n", controller->oregs->op_usbsts);
+	if (controller->oregs->op_usbsts & (1 << 2)) goto error;
+
+
+	printf("xhci: doorbells at %#x\n", controller->cregs->cap_dboff);
+	controller->doorbells = (volatile uint32_t*)((uint64_t)controller->cregs + controller->cregs->cap_dboff);
+
+	/* Just want to enable the hub for now, see if we can id it */
+	controller->cr_trbs = (xhci_trb*)cr_trbs_virt;
+	controller->er_trbs = (xhci_trb*)er_trbs_virt;
+
+	controller->command_queue_cycle = 1;
+	controller->command_queue_enq = 0;
+
+	printf("xhci: status before ring = %x\n", controller->oregs->op_usbsts);
+	xhci_command(controller, 0, 0, 0, (23 << 10));
+error:
+	// to do
 }
 
 uint64_t find_xhci(uint32_t device, uint16_t v, uint16_t d, void * extra)

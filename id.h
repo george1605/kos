@@ -135,6 +135,22 @@ struct idr* idr_setup()
     return idr;
 }
 
+void idr_remove_id(struct idr_layer* idr, unsigned int id)
+{
+    struct idr_layer* top = idr;
+    struct idr_node* node;
+    for(int i = 0;i < 8;i++) {
+        if(idr_is_leaf(top->ary[i])) {
+            node = (idr_node*)top->ary[i];
+            if(node->start == id) {
+                free(node), top->ary[i] = NULL_PTR;
+                break;
+            }
+        } else 
+            idr_remove_id(top->ary[i], id);
+    }
+}
+
 void idr_free_layers(struct idr_layer* layer)
 {
     for(int i = 0;i < 8;i++)

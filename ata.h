@@ -435,15 +435,20 @@ void ata_open_disk(uint32_t disk, uint8_t partition, mbr_partition *out) {
   free(raw);
 }
 
-inline uint8_t ata_is_ext2(mbr_partition *out) {
+inline uint8_t ata_is_ext2(mbr_partition *out) 
+{
     return out->type == 0x83;
 }
 
-size_t ata_partition_size(fs_partition* fspart) {
+size_t ata_partition_size(fs_partition* fspart) 
+{
     return (fspart->end_lba - fspart->start_lba) * SECTOR_SIZE;
 }
 
 void ata_partition_split(fs_partition in, size_t offset, fs_partition* out[2])
 {
-
+    out[0]->start_lba = in.start_lba;
+    out[0]->end_lba = in.start_lba + offset;
+    out[1]->start_lba = in.start_lba + offset + 1;
+    out[1]->end_lba = in.end_lba;
 }

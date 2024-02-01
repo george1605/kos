@@ -96,7 +96,7 @@ void vfsunlink(struct vfile* chvf)
     return;
   if(--p->refcnt <= 0)
   {
-    // TO DO: delete the file
+    
   }
   chvf->parent = (struct vfile*)NULL_PTR;
   chvf->fd = fdalloc(); // get a different fd

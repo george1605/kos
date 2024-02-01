@@ -78,17 +78,18 @@ void init()
   ioapic_init(); // init these, would need for multiproc.
   lapicinit();
   mpinit(); // SMP
-  proc_init();
   pci_init();
   ata_init();
   kbd_init();
   mouse_init();
   timer_init();
-  dsp_init();
   switch_long_mode();
   syscinit();
   load_processor_info(); // load info and set up SYSCALL instr handler
   kprint("x64 Mode Activated. (Respect +)");
+  mmu_init();
+  proc_init();
+  dsp_init();
   fs_init();
   vfsinit();
   user_init();

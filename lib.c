@@ -668,7 +668,6 @@ void pwarn(char *text)
   }
 }
 
-// TO DO: Check actual definitions of these macros
 #define va_start(arg, list) list = (va_list)&arg
 #define va_arg(ap, type) (*(type*)((ap += sizeof(type)) - sizeof(type)))
 #define va_end(list) list = (va_list)NULL_PTR

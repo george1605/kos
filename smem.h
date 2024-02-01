@@ -8,6 +8,15 @@
 #define PAGE_PRESENT  0x1
 #define PAGE_WRITABLE 0x2
 #define PAGE_USER     0x4
+
+#define PAGE_KERNEL       0x01
+#define PAGE_WRITABLE     0x02
+#define PAGE_NOCACHE      0x04
+#define PAGE_WRITETHROUGH 0x08
+#define PAGE_SPEC         0x10
+#define PAGE_WC           (MMU_FLAG_NOCACHE | MMU_FLAG_WRITETHROUGH | MMU_FLAG_SPEC)
+#define PAGE_NOEXECUTE    0x20
+#define PAGE_GET_MAKE     0x01
 #include "lib.c"
 #include "mem.h"
 #define PAGE_ALLIGN(x) (void *)(x - x % 4096 + 4096)
@@ -348,11 +357,11 @@ void* map_page(void* physaddr, void* virtualaddr, size_t flags)
     return virtualaddr;
 }
 
-void add_to_ptable(pagetable* tbl, void* virt, void* phys)
+void* mmu_add_ptable(pagetable* tbl, void* virt, void* phys, size_t flags)
 {
-  uint64_t pdindex = (uint64_t)virt >> 22;
-  uint64_t ptindex = (uint64_t)virt >> 12 & 0x03FF;
-  
+  uint64_t ptindex = ((uint64_t)virt >> 12) & 0x03FF;
+  tbl->entries[ptindex] = ((uint64_t)phys) | (flags & 0xFFF) | 0x01;
+  return virt;
 }
 
 void *get_phys(void *virtualaddr)
@@ -372,10 +381,54 @@ void enable_paging(uint64_t address)
   asm volatile("movl %0, %%cr3":"r"(address), "=r"(__ignore));
 }
 
+void mmu_init()
+{
+  asm volatile (
+		"movq %%cr0, %%rax\n"
+		"orq  $0x10000, %%rax\n"
+		"movq %%rax, %%cr0\n"
+		: : : "rax");
+}
+
 static inline void tlb_flush(uint64_t addr) // invalidates a page
 {
   asm volatile("invlpg (%0)" ::"r"(addr)
                : "memory");
+}
+
+struct {
+  struct spinlock kern_lock;
+  struct spinlock mmio_lock;
+  struct spinlock mod_lock; // module space, ELFs
+} memlocks;
+
+uint64_t mmu_allocate_a_page()
+{
+  // TO DO
+  pagetable* tbl;
+  return 0;
+}
+
+char * mmio_base = (char*)DRIV_MEM;
+void * mmu_map_mmio_region(uint64_t physical_address, size_t size) {
+	spin_lock(&memlocks.mmio_lock);
+	void * out = (void*)mmio_base;
+	for (size_t i = 0; i < size; i += PAGE_SIZE) {
+		struct pagtable* p = mmu_get_page(mmio_base + i, PAGE_GET_MAKE);
+		mmu_frame_map_address(p, PAGE_KERNEL | PAGE_WRITABLE | PAGE_NOCACHE | PAGE_WRITETHROUGH, physical_address + i);
+	}
+	mmio_base += size;
+	spin_unlock(&memlocks.mmio_lock);
+
+	return out;
+}
+
+static uint64_t allocate_page(uint64_t * phys_out) {
+	uint64_t phys = mmu_allocate_a_frame() << 12;
+	uint64_t virt = (uint64_t)mmu_map_mmio_region(phys, 4096);
+	memset((void*)virt,0,4096);
+	*phys_out = phys;
+	return virt;
 }
 
 void mem_unmap(pagetable* table)
@@ -428,8 +481,24 @@ void copy_from_user_align(char* kptr, const void* uptr, size_t size, uint16_t al
 void copy_into_kernel(uint32_t offset, const void* ptr, size_t size)
 {
   void* kptr = (void*)(KERN_MEM + offset);
-  copy_from_user(kptr, ptr, size);
+  copy_from_user((char*)kptr, ptr, size);
 }
+
+uint64_t mmu_first_n_frames(int n) {
+	for (uint64_t i = 0; i < nframes * PAGE_SIZE; i += PAGE_SIZE) {
+		int bad = 0;
+		for (int j = 0; j < n; ++j) {
+			if (mmu_frame_test(i + PAGE_SIZE * j)) {
+				bad = j + 1;
+			}
+		}
+		if (!bad) {
+			return i / PAGE_SIZE;
+		}
+	}
+	return (uint64_t)-1;
+}
+
 
 typedef struct {
   void* ptr;
