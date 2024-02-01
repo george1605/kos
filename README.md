@@ -7,10 +7,14 @@ There isn't a Makefile, but the commands are pasted in
 `file.sf`. Please have `qemu` and `nasm` installed.
 
 # To do
-* create more syscalls and update `stdlib.c`
-* add generic interfaces for ioctl and fb
+* create more syscalls and update `stdlib.c` (divide in libc and posix headers)
+* <s>add generic interfaces for ioctl and fb</s>
 * improve xhci driver
 * fix scheduler
-* add data structures like hasmap and tree.
+* add data structures like <s>hasmap</s> and tree.
 
-* ## Note: Aiming for vers 3.0
+### To Port
+* Tetris (by jdh)
+* Doom
+
+* ### Note: Aiming for vers 3.0
