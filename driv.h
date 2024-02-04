@@ -4,6 +4,7 @@
 #include "fs.h"
 #include "dma.h"
 #include "elf.h"
+#include "drivers/ioctl.h"
 #define IOMEM_DMA 1
 #define VERSION(a,b,c) a * 1000 + b * 100 + c 
 #define MODULE_VERSION(str) obj->version = __make_version(str)
@@ -31,6 +32,30 @@ struct iomem
   size_t channel; // for DMA
   size_t size; // also for DMA
 };
+
+struct kmodule
+{
+  char* name;
+  char ioctl_code; // a code ranging from
+  void(*entry)();
+  void(*exit)();
+  void(*ioctl)(int, size_t, size_t);
+};
+
+void kmod_load(struct kmodule* module)
+{
+  struct mod_info info;
+  info.name = module->name;
+  info.entry = module->entry;
+  info.exit = module->exit; 
+  mod_load(&info);
+  hashmap_set(&ioctlmap.i_map, (void*)module->ioctl_code, module->ioctl);
+}
+
+void kmod_unload(char* name)
+{
+  mod_unload(name);
+}
 
 // similar to iorequest()
 void* iommap(void* mem, struct iomem info, int type)
