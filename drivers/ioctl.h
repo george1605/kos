@@ -2,6 +2,8 @@
 #include "../lib.c"
 #include "../port.h"
 #include "../tty.c"
+#include "../fs.h"
+#include "modules/hashmap.h"
 //ported from Linux
 typedef uint8_t cc_t;
 
@@ -83,6 +85,12 @@ struct termios2 {
 #define DEVINIT          IOW('D', 0x05, uint8_t)
 #define DEVSTAT          IOR('D', 0x06, struct stat*)
 
+#define FBSEL            IOW('F', 0x01, uint8_t)
+#define FBSETP           IOW('F', 0x02, uint32_t)
+#define FBGETP           IOR('F', 0x03, uint32_t)
+#define FBGETWD          IOR('F', 0x04, uint16_t*)
+#define FBGETHG          IOR('F', 0x05, uint16_t*)
+
 #define KEY_SEND	 231	
 #define KEY_REPLY	 232	
 #define KEY_FORWARDMAIL	 233	
@@ -113,11 +121,6 @@ struct inputev { /* input event */
   int time;
   int code;
   int value;
-};
-
-struct inputhnd {
-  const char *name;
-  void *private;
 };
 
 #define BUS_PCI 0x1
@@ -159,7 +162,7 @@ int is_device(int fd)
 static void dev_setup_pci(ext2_gen_device* dev, uint32_t device)
 {
   dev->priv = kalloc(sizeof(struct deviceinfo), KERN_MEM);
-  struct deviceinfo* info = dev->priv;
+  struct deviceinfo* info = (struct deviceinfo*)dev->priv;
   info->irq_no = pci_get_interrupt(device);
   info->bus_num = device;
   info->type = INODE_TYPE_CHAR_DEV;
@@ -169,7 +172,7 @@ static void dev_setup_pci(ext2_gen_device* dev, uint32_t device)
 static void dev_setup_io(ext2_gen_device* dev, uint16_t port)
 {
   dev->priv = kalloc(sizeof(struct deviceinfo), KERN_MEM);
-  struct deviceinfo* info = dev->priv;
+  struct deviceinfo* info = (struct deviceinfo*)dev->priv;
   info->irq_no = 32;
   info->bus_num = port;
   info->type = INODE_TYPE_CHAR_DEV;
@@ -186,7 +189,7 @@ static uint8_t dev_getc(int fd)
   char charb[2]; // for safety measures
   ext2_gen_device device;
   find_device(fd, &device);
-  device.read(charb, device.offset, 1, &device);
+  device.read((uint8_t*)charb, device.offset, 1, &device);
   return charb[0]; 
 }
 
@@ -195,7 +198,7 @@ static void dev_putc(int fd, uint8_t chars)
   ext2_gen_device device;
   find_device(fd, &device);
   char charp[2] = {chars, 0};
-  device.write(charp, device.offset++, 1, &device);
+  device.write((uint8_t*)charp, device.offset++, 1, &device);
 }
 
 static void dev_set_irq(int fd, void(*func)(struct regs*))
@@ -210,10 +213,24 @@ static void dev_stat(int fd, struct stat* stat)
 {
   ext2_gen_device device;
   find_device(fd, &device);
-  struct deviceinfo* info = device.priv;
+  struct deviceinfo* info = (struct deviceinfo*)device.priv;
   stat->st_dev = device.dev_no;
   stat->st_blksize = info->blocksize;
   stat->st_blocks = 0;
+} 
+
+void dev_init(int fd, size_t args)
+{
+  ext2_gen_device* dev = (ext2_gen_device*)myproc()->ofiles[fd].extra;
+  switch((args >> 32) & 0xFF)
+  {
+  case 1:
+    dev_setup_io(dev, args);
+    break;
+  case 2:
+    dev_setup_pci(dev, args);
+    break;
+  }
 }
 
 static void dev_ctl(int fd, size_t cmd, size_t args)
@@ -225,23 +242,27 @@ static void dev_ctl(int fd, size_t cmd, size_t args)
   case DEVSETC:
     dev_putc(fd, args & 0xff);
   case DEVSETIRQ:
-    dev_set_irq(fd, (void*)args);
+    dev_set_irq(fd, (void(*)(struct regs*))args);
   case DEVSTAT:
     dev_stat(fd, (struct stat*)args);
+  case DEVINIT:
+    dev_init(fd, args);
   }
 }
 
 struct _ioctl {
-  char id; // 'T', 'X' etc.
-  void(*iof)(int fd, size_t cmd, size_t arg);
-  struct _ioctl* next, *prev; 
+  struct spinlock i_lock;
+  hashtable i_map; 
 } ioctlmap;
 
 void ioctl(int fd, size_t cmd, size_t arg)
 {
   if(is_tty(fd))
     ttyctl(fd - TTYBASE, cmd - 0x5400);
-
-  if(is_device(fd) && _IOC_TYPE(cmd) == 'D')
+  else if(is_device(fd) && _IOC_TYPE(cmd) == 'D')
     dev_ctl(fd, cmd, arg);
+  else {
+    void* func = hashmap_get(&ioctlmap.i_map, (void*)(_IOC_TYPE(cmd)));
+    ((void(*)(int, size_t, size_t))func)(fd, cmd, arg);
+  }
 }

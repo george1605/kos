@@ -539,7 +539,7 @@ size_t fsize(struct file u)
 struct stat fstat(struct file f)
 {
   struct stat i;
-  ext2_stat(f, &i, fs_dev, fs_dev->priv);
+  ext2_stat(f.name, &i, fs_dev, fs_dev->priv);
   return i;
 }
 

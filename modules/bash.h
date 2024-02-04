@@ -16,7 +16,7 @@ struct shell
 // in the binary dir (will make one that looks through PATH env later)
 char* find_ex(char* arg0)
 {
-  char* buf = kalloc(300, KERN_MEM);
+  char* buf = (char*)kalloc(300, KERN_MEM);
   memcpy(buf, "/dev/bin/", 9);
   memcpy(buf + 9, arg0, strlen(arg0));
   return buf;
@@ -73,16 +73,26 @@ void cmdexec(char* str){
     kprint(args[1]);
   }else if(strcmp(comm,"mkdir")){
     if(str[6] == 0) return;
-    mkdir(str + 6, &root);
+    mkdir(str + 6, F_READ | F_WRITE);
   }else{
     sys_execv(args[0], args + 4);
   }
 }
 
+int is_so(char* name)
+{
+  int len = strlen(name);
+  return !memncmp(name + len - 3, ".so", 3);
+}
+
 void argexec(int argc, char** argv){
+  if(is_so(argv[0]))
+  {
+    mod_load_file(argv[0]);
+  }
   if(strcmp(argv[0], "sudo"))
   {
-    kprintf("password: ");
+    printf("password: ");
     setuid(0);
     argexec(argc - 1, argv + sizeof(char*));
   }else if(strcmp(argv[0], "touch")){

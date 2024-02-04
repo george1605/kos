@@ -5,6 +5,8 @@
 #include "pipe.c"
 #include "process.h"
 #include "fs.h"
+#include "modules/hashmap.h"
+#define START(name, entry) struct proc* _p = prnew_k(name, 64000); _p->f = entry; prsetupvm(_p); prappend(*_p); sched();
 #define ELF_32 2
 #define ELF_64 4
 
@@ -54,8 +56,68 @@ struct ProgramHeader
   long p_memsz;
 };
 
-typedef void(*entry_t)(void);
+#define MOD_KERNEL  0x1
+#define MOD_PROC    0x2
+#define MOD_DYNAMIC 0x3
 
+struct mod_info
+{
+  char* name;
+  void(*entry)();
+  void(*exit)();
+};
+
+struct {
+  struct spinlock m_lock;
+  struct hashtable m_table;
+} modules;
+
+void mod_load(struct mod_info* info)
+{
+  acquire(&modules.m_lock);
+  hashmap_set(&modules.m_table, info->name, info);
+  release(&modules.m_lock);
+  info->entry();
+}
+
+void mod_load_file(char* filename)
+{
+
+}
+
+void mod_unload(char* name)
+{
+  struct mod_info* info = hashmap_get(&modules.m_table, name);
+  info->exit();
+  acquire(&modules.m_lock);
+  hashmap_remove(&modules.m_table, name);
+  release(&modules.m_lock);
+}
+
+struct proc* mod_as_proc(struct mod_info* info)
+{
+  struct proc* p = prnew_k(info->name, 256 * 1024); // 256KB
+  prsetupvm(p);
+  addexit(p, info->exit);
+  p->f = info->exit;
+  return p;
+}
+
+void mod_run(struct mod_info* info, int mode)
+{
+  switch(mode)
+  {
+  case MOD_KERNEL:
+    mod_load(info);
+    break;
+  case MOD_PROC:
+    prappend(*mod_as_proc(info));
+    sched();
+    break;
+  }
+}
+
+typedef void(*entry_t)(void);
 // loads the header and returns the entry point
 // got from xv6, same source of struct buf madness
 entry_t elfloadall(struct ElfHeader* hdr)
@@ -293,4 +355,45 @@ struct ElfSymbol getsym(int *ptr)
   i.st_size = ptr[1];
   i.st_name = (size_t)ptr[2];
   return i;
+}
+
+uint8_t elf_start(uint8_t *buf, elf_priv_data *priv)
+{
+	ElfHeader *header = (ElfHeader*)buf;
+	mprint("Type: %s%s%s\n",
+		header->e_ident[4] == 1 ? "32bit ":"64 bit",
+		header->e_ident[5] == 1 ? "Little Endian ":"Big endian ",
+		header->e_ident[6] == 1 ? "True ELF ":"buggy ELF ");
+	if(header->e_type != 2)
+	{
+		kprintf("File is not executable!\n");
+		return 0;
+	}
+	/* Map the virtual space */
+	uint32_t phys_loc = heapbrk;
+	uint32_t cr3 = kalloc(4096, KERN_MEM);
+	/* Find first program header and loop through them */
+	ProgramHeader *ph = (ProgramHeader *)(buf + header->e_phoff);
+	for(int i = 0; i < header->e_phnum; i++, ph++)
+	{
+		switch(ph->p_type)
+		 {
+		 	case 0: /* NULL */
+		 		break;
+		 	case 1: /* LOAD */
+		 		printf("LOAD: offset 0x%x vaddr 0x%x paddr 0x%x filesz 0x%x memsz 0x%x\n",
+		 				ph->p_offset, ph->p_vaddr, ph->p_paddr, ph->p_filesz, ph->p_memsz);
+		 		map_page(ph->p_vaddr, phys_loc, PAGE_PRESENT | PAGE_WRITABLE);
+		 		memcpy(ph->p_vaddr, buf + ph->p_offset, ph->p_filesz);
+		 		break;
+      case :
+
+        break;
+		 	default: 
+		 	 kprint("Unsupported p_type! Bail out!\n");
+		 	 return 0;
+		 }
+	}
+	/* Program loaded, jump to execution */
+	START("elf", header->e_entry);
 }

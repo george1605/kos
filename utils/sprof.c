@@ -1,5 +1,5 @@
-#include "process.h"
-#include "stdlib.h"
+#include "../process.h"
+#include "../stdlib.c"
 
 int main(int argc, char** argv)
 {

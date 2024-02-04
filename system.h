@@ -1,14 +1,15 @@
 #pragma once
 #include "lib.c"
 #include "process.h"
+#include "elf.h"
 #include "port.h"
-#include "smem.h"
 #include "time.c"
 #include "fs.h"
 #include "vfs.h"
 #include "user.h"
 #include "pci.h"
 #include "acpi.h"
+#include "gui.c"
 #define __SYSCALL static inline 
 #define SYSCALL_EXIT 1
 #define SYSCALL_READ 2
@@ -107,8 +108,7 @@ __SYSCALL int sys_open(void *arg1, void *arg2)
 __SYSCALL void sys_mkdir(void *arg1, void *arg2)
 {
   char *dname = (char *)arg1;
-  struct file *parent = (struct file *)arg2;
-  mkdir(dname, parent);
+  mkdir(dname, (int)arg2);
 }
 
 __SYSCALL void sys_vfsread(void* arg1, void* arg2)
@@ -168,7 +168,7 @@ __SYSCALL void sys_setuid(int uid)
 __SYSCALL void sys_userls(int gid, char* list, size_t size)
 {
   struct group group;
-  struct buf* buffer = kalloc(sizeof(struct buf), KERN_MEM);
+  struct buf* buffer = (struct buf*)kalloc(sizeof(struct buf), KERN_MEM);
   int fd = prfopen(myproc(), "/home/users", F_READ);
   group_load(buffer, gid, &group);
   user_ls(&group, list, size);
@@ -210,23 +210,6 @@ void sysc_handler(struct regs *r)
                : "r"(r->edi), "r"(r->esi), "r"(r->edx), "r"(r->ecx),
                  "r"(r->ebx), "r"(handler));
   r->eax = ret;
-}
-
-void* userm_malloc(size_t size)
-{
-  uint32_t p;
-  asm volatile("int $0x80" : "=a"(p) : "a"(SYSCALL_MALLOC));
-  return (void*)p;
-}
-
-void userm_free(void* ptr)
-{
-  asm volatile("int $0x80" ::"a"(SYSCALL_FREE), "b"(ptr));
-}
-
-void userm_exit(int code)
-{
-  asm volatile("int $0x80" ::"a"(SYSCALL_EXIT), "b"(code));
 }
 
 void switch_userm()
@@ -337,19 +320,6 @@ struct proc __SYSCALL sys_execv(char *path, char *argv[])
 
 #define GETPROC(x) *(struct proc *)(x[0]) // gets an proc structure from char**
 
-void _waitfunc(int argc, char **argv)
-{
-  struct proc i = GETPROC(argv);
-  if (argc == 1)
-  {
-    while (1)
-    {
-      if (i.state == PAUSED)
-        break;
-    }
-  }
-}
-
 struct rmentry
 {
   void *ptr;
@@ -405,6 +375,18 @@ void sys_exit(void* arg1)
   kprexit(p, (int)arg1);
 }
 
+__SYSCALL void sys_insmod(char* file)
+{
+  if(!fs_dev->fs->exist(file, fs_dev, fs_dev->priv))
+    return;
+  mod_load_file(file);
+}
+
+__SYSCALL void sys_delmod(char* file)
+{
+  mod_unload(file);
+}
+
 // add more if needed
 void syscinit()
 {
@@ -418,4 +400,6 @@ void syscinit()
   sysc_add(8, sys_execv);
   sysc_add(9, sys_fork);
   sysc_add(10, sys_ioctl);
+  sysc_add(18, sys_insmod);
+  sysc_add(19, sys_delmod);
 }

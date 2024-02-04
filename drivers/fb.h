@@ -148,6 +148,10 @@ struct fb_rect
 
 #define FONT_UTF8 0x1
 #define FONT_UNICODE 0x2
+#define FB_IMAGE_RGB 0x0
+#define FB_IMAGE_RGBA 0x1
+#define FB_IMAGE_CMYK 0x2
+#define FB_IMAGE_MONO 0x3
 
 struct fb_font
 {
@@ -165,6 +169,31 @@ typedef struct {
 typedef struct {
     float x, y;
 } fb_point2d;
+
+typedef struct {
+	uint8_t* data;
+	uint16_t w, h;
+	uint32_t flags;
+} fb_image;
+
+typedef struct {
+	uint8_t r, g, b, a;
+} fb_rgb;
+
+typedef struct {
+	uint8_t c, m, y, k;
+} fb_cmyk;
+
+uint32_t fb_convert_cmyk(fb_cmyk cmyk)
+{
+	fb_cmyk* col = &cmyk;
+	fb_rgb rgb;
+	rgb.r = (int)(255 * (1 - col->c / 255.0) * (1 - col->k / 255.0));
+    rgb.g = (int)(255 * (1 - col->m / 255.0) * (1 - col->k / 255.0));
+    rgb.b = (int)(255 * (1 - col->y / 255.0) * (1 - col->k / 255.0));
+    rgb.a = 0;
+	return *(uint32_t*)&rgb;
+}
 
 struct {
     float focal;
@@ -255,11 +284,25 @@ void fb_copy(uint32_t *buffer, struct fb_rect info)
 			((uint32_t *)fb_info.mem)[j * width + i] = buffer[j * width + i];
 }
 
+// idk why I'd done that
+void fb_copy_mono(uint8_t* buffer, struct fb_rect info, uint32_t cols[2])
+{
+	size_t width = info.x2 - info.x1;
+	size_t loc = 0;
+	for (int i = info.x1; i <= info.x2; i++)
+		for (int j = info.y1; j <= info.y2; j++) {
+			loc = j * width + i;
+			for(int i = 0;i < 8;i++) {
+				((uint32_t*)fb_info.mem)[loc] = (buffer[loc / 8] & (1 << (loc % 8))) ? cols[0]: cols[1];
+			}
+		}	
+}
+
 void fb_write_char(struct fb_font* font, uint16_t ch, struct fb_rect rect)
 {
 	if(ch > 0xFF && font->std != FONT_UNICODE) return;
-	uint32_t* buffer = kalloc(font->width * font->height * 4, KERN_MEM);
-	font->get_char(font, buffer, ch);
+	uint32_t* buffer = (uint32_t*)kalloc(font->width * font->height * 4, KERN_MEM);
+	font->get_char(font, (uint8_t*)buffer, ch);
 	fb_copy(buffer, rect);
 }
 

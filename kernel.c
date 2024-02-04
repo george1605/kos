@@ -11,7 +11,7 @@ void _shell(){
 
 void kernel_main(){
   kernel_setup(0);
-  cmdexec(gets(32));
+  shell_as_start(); // start as the shell
   while(1){
     if(glsig == RESTART)
       acpi_reset();

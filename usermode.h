@@ -10,6 +10,8 @@
 #define SYSCALL_EXECV 8
 #define SYSCALL_FORK 9
 #define SYSCALL_IOCTL 10
+#define SYSCALL_INSMOD 18
+#define SYSCALL_DELMOD 19
 
 #define F_NEW 1
 #define F_READ 2
@@ -43,6 +45,22 @@ void userm_mkdir(char* dir)
   asm volatile("int $0x80" ::"a"(SYSCALL_MKDIR), "b"(dir)); 
 }
 
+int userm_open(char* file, int perms) 
+{
+  int result;
+  asm volatile(
+      "movl %1, %%ebx\n\t"   
+      "movl %2, %%ecx\n\t"   // file pointer
+      "movl $%3, %%eax\n\t"  // syscall number
+      "int $0x80\n\t"
+      "movl %%eax, %0"        // store the result in 'result'
+      : "=r" (result)         // output operand
+      : "r" (file), "r" (perms), "i" (SYSCALL_OPEN)  // input operands
+      : "%ebx", "%ecx", "%eax"  // clobbered registers
+  );
+  return result;
+}
+
 int userm_fork()
 {
   int pid;
@@ -61,4 +79,14 @@ void userm_ioctl(int fd, size_t cmd, size_t arg) {
         : [syscall_nr] "i" (SYSCALL_IOCTL), [fd] "r" (fd), [cmd] "r" (cmd), [arg] "r" (arg)
         : "rax", "rdi", "rsi", "rdx", "rcx", "memory"
     );
+}
+
+void userm_insmod(char* file)
+{
+  asm volatile("int $0x80" ::"a"(SYSCALL_INSMOD), "b"(file));
+}
+
+void userm_delmod(char* file)
+{
+  asm volatile("int $0x80" ::"a"(SYSCALL_DELMOD), "b"(file));
 }
