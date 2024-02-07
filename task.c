@@ -14,56 +14,19 @@ struct task {
  size_t size;
  struct proc* parent;
  struct file* ofiles;
+ jmp_buf ctx;
  int(*f)(void);
 };
 
-struct task newtask(int type){
-  struct task t;
-  struct proc u = prcreat("NEW TASK");
-  t.pid = u.pid;
-  t.flags = type;
-  if(type & MEM_TASK)
-     t.res = u.stack;
-  return t;
-}
-
-void endtask(struct task u){
-  HALT();
-  if(u.flags & MEM_TASK)
-    free((int*)u.res);
-  else
-    u.res = (char*)0;
-  u.pid = 0;
-}
-
-struct task duptask(struct task i){
-  struct task u;
-  struct proc p;
-  u.flags = i.flags;
-  return u;
-}
-
-void pushsem(struct task i, size_t value){
-  if(i.cnt < 8)
-    i.sems[++i.cnt] = value;
-}
-
-void exectask(struct task i){
-  i.sems[0] = 0;
-  i.f();
-}
-
-struct task creatask(int var, void* ret, int(*myf)(void)){
-   struct task i = newtask(MEM_TASK | IO_TASK);
-   i.f = myf;
-   i.sems[0] = var;
-   *(int*)ret = myf();
-   return i;
-}
+typedef struct {
+  struct task** threads;
+  int num_threads;
+  int current_thread;
+} scheduler;
 
 void loadtask(){
   int __ignore;
-  asm("mov %0, %%ax; ltr %ax":"=r"(__ignore):"r"(0x28));
+  asm("mov %0, %%ax; ltr %ax":"=r"(__ignore):"r"(24));
 }
 
 struct ptask 
@@ -121,15 +84,28 @@ void pload()
 
 #endif
 
-struct task task_creat(int ring, long long stack)
+int subproc_check(scheduler* scheduler, int thread_id) {
+  if (setjmp(scheduler->threads[thread_id]->ctx) == 0) {
+      longjmp(scheduler->threads[scheduler->current_thread]->ctx, 1);
+  }
+}
+
+// a task switcher inside a process
+void subproc_schedule(scheduler* scheduler) {
+    if (setjmp(scheduler->threads[scheduler->current_thread]->ctx) == 0) {
+        // Switch to the next thread
+        scheduler->current_thread = (scheduler->current_thread + 1) % scheduler->num_threads;
+        longjmp(scheduler->threads[scheduler->current_thread]->ctx, 1);
+    }
+}
+
+void subproc_sched(scheduler* scheduler) 
 {
-  if(ring == 0)
-     return;
-  struct task c = newtask(IO_TASK);
-  c.perm = MEM_TASK;
-  if(ring < 2)
-    iopriv();
-  return c;
+  while(1)
+  {
+    for(int i = 0;i < )
+    subproc_schedule(scheduler);
+  }
 }
 
 struct task* subproc(struct proc* p, size_t memsz, int flags) // subprocess
@@ -144,15 +120,7 @@ struct task* subproc(struct proc* p, size_t memsz, int flags) // subprocess
   return t;
 }
 
-void psched()
+void subproc_launch(struct scheduler* sched, struct task* task)
 {
-  int a, max = -100;
-  for(a = 0;ptasks[a].pid != 0;a++)
-  {
-    if(ptasks[a].priot > max)
-    { 
-      max = ptasks[a].priot;
-      ptasks[a].f();
-    }
-  }
+  subproc_schedule(sched);
 }

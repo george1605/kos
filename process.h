@@ -106,13 +106,13 @@ void sched()
   struct proc p = prlist.procs[ffront];
   prlist.front = (prlist.front + 1) % prlist.cnt;
   prlist.size--;
-  release();
+  release(&prlist.lock);
   prswap(&prlist.procs[ffront]);
   delay(5000); // <-- this corresponds to the time frame for each process
   prswap(&tproc);
   if(prlist.procs[ffront].state != KILLED)
   {
-    acquire(&prlsit.lock);
+    acquire(&prlist.lock);
     prlist.rear = (prlist.rear + 1) % prlist.cnt;
     prlist.procs[prlist.rear] = p;
     prlist.size++;

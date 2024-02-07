@@ -990,3 +990,41 @@ void strcpy(char* dest, const char* src)
   int len = min(strlen(dest), strlen(src));
   memcpy(dest, src, len);
 }
+
+typedef struct {
+  uint32_t context[10];
+} jmp_buf;
+
+int setjmp(jmp_buf env) {
+    asm volatile (
+        "movl %%ebx, 0(%0)\n"
+        "movl %%esi, 4(%0)\n"
+        "movl %%edi, 8(%0)\n"
+        "movl %%esp, 12(%0)\n"
+        "movl %%ebp, 16(%0)\n"
+        : : "r" (env.context)
+    );
+
+    return 0;
+}
+
+void longjmp(jmp_buf env, int val) {
+    asm volatile (
+        "movl 0(%0), %%ebx\n"
+        "movl 4(%0), %%esi\n"
+        "movl 8(%0), %%edi\n"
+        "movl 12(%0), %%esp\n"
+        "movl 16(%0), %%ebp\n"
+        : : "r" (env.context)
+    );
+
+    asm volatile (
+        "movl %0, %%eax\n"
+        : : "r" (val)
+    );
+
+    asm volatile (
+        "jmp *%%eax\n"
+        :
+    );
+}

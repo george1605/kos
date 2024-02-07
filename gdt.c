@@ -23,7 +23,7 @@ struct gdt_ptr
 
 struct gdt_entry gdt[3];
 struct gdt_ptr gp;
-
+struct taskstate tss;
 extern void gdt_flush();
 
 void gdt_set_gate(int num, unsigned long base, unsigned long limit, unsigned char access, unsigned char gran)
@@ -49,6 +49,7 @@ void gdt_install()
     gdt_set_gate(1, 0, 0xFFFFFFFF, 0x9A, 0xCF);
 
     gdt_set_gate(2, 0, 0xFFFFFFFF, 0x92, 0xCF);
+    gdt_set_gate(3, (uint32_t)&tss, sizeof tss, 0x89, 0x80);
     gdt_flush();
 }
 
