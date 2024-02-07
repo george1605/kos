@@ -42,6 +42,12 @@
 #define DSP_ON_16       0xD6
 #define DSP_VERSION     0xE1
 char _soundbuf[4096];
+uint8_t _volume;
+
+void dsp_master(uint8_t volume)
+{
+    _volume = volume;
+}
 
 void dsp_write(u8 b) {
     while (inportb(DSP_WRITE) & 0x80);

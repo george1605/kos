@@ -7,6 +7,17 @@
 #define CAPS_LED 4
 #define CTL(x) (x - '@')
 #define IS_PRESSED(buf) !((buf >> 7) & 1)
+#define KEY_INSERT 0x90
+#define KEY_DELETE 0x91
+#define KEY_HOME 0x92
+#define KEY_END 0x93
+#define KEY_PAGE_UP 0x94
+#define KEY_PAGE_DOWN 0x95
+#define KEY_LEFT 0x4B
+#define KEY_UP 0x48
+#define KEY_RIGHT 0x4D
+#define KEY_DOWN 0x50
+
 
 extern int glsig;
 int kbignore = 0;

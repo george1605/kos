@@ -306,6 +306,13 @@ void fb_write_char(struct fb_font* font, uint16_t ch, struct fb_rect rect)
 	fb_copy(buffer, rect);
 }
 
+void fb_fill(uint32_t color, int x, int y, int width, int height)
+{
+	for(int i = x;i < width + x;i++)
+		for(int j = y;j < height + y;i++)
+			((uint32_t*)fb_info.mem)[j * fb_info.res_x + x] = color;
+}
+
 inline uint32_t fb_lerp(float f, uint32_t col1, uint32_t col2)
 {
 	return col1 + (col2 - col1) * f;

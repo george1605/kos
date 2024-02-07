@@ -19,7 +19,7 @@ size_t* getfb(){
   return u;
 }
 
-int RGB(int r,int g,int b){
+inline int RGB(int r,int g,int b){
    return (r | (g << 8) | (b << 16));
 }
 

@@ -1,3 +1,4 @@
+#include "../lib.c"
 #include "../screen.h"
 #include "../smem.h"
 #include "../drivers/soundcard.h"
@@ -10,6 +11,10 @@
 #define LEVELS 30
 #define TILE_SIZE 10
 #define LOGO_HEIGHT 5
+#ifndef LOBIT
+#define LOBIT(x) (x & 0xFF)
+#define HIBIT(x) (x >> 8)
+#endif
 
 static const char *LOGO[LOGO_HEIGHT] = {
     "AAA BBB CCC DD  EEE FFF",
@@ -40,26 +45,26 @@ enum Tile {
 // tried to keep the proportions, but modified a bit to fit the scheme
 static const u8 TILE_COLORS[NUM_TILES] = {
     [NONE] =    RGB(10, 10, 10),
-    [GREEN] =   COLOR(0, 182, 0),
-    [ORANGE] =  COLOR(182, 91, 0),
-    [YELLOW] =  COLOR(182, 150, 0),
-    [PURPLE] =  COLOR(109, 0, 109),
-    [PINK] =    COLOR(182, 0, 182),
-    [BLUE] =    COLOR(0, 0, 63),
-    [CYAN] =    COLOR(0, 109, 109),
-    [RED] =     COLOR(182, 0, 0),
-    [BORDER] =  COLOR(109, 109, 32),
+    [GREEN] =   RGB(0, 182, 0),
+    [ORANGE] =  RGB(182, 91, 0),
+    [YELLOW] =  RGB(182, 150, 0),
+    [PURPLE] =  RGB(109, 0, 109),
+    [PINK] =    RGB(182, 0, 182),
+    [BLUE] =    RGB(0, 0, 63),
+    [CYAN] =    RGB(0, 109, 109),
+    [RED] =     RGB(182, 0, 0),
+    [BORDER] =  RGB(109, 109, 32),
 };
 
 static struct {
     char content[512];
-    u64 ticks;
+    uint64_t ticks;
 } notification = {
     "", -1
 };
 
 const char *get_notification() {
-    return timer_get() - notification.ticks <= NOTIFICATION_DURATION_TICKS ?
+    return timer_ticks - notification.ticks <= NOTIFICATION_DURATION_TICKS ?
         ((const char *) &notification.content) : NULL;
 }
 
@@ -67,11 +72,11 @@ void notify(const char *message) {
     memcpy(
         &notification.content,
         message,
-        MIN(strlen(message) + 1, sizeof(notification.content))
+        min(strlen((char*)message) + 1, sizeof(notification.content))
     );
 
     notification.content[sizeof(notification.content) - 1] = 0;
-    notification.ticks = timer_get();
+    notification.ticks = timer_ticks;
 }
 
 u8 TILE_SPRITES[NUM_TILES][TILE_SIZE * TILE_SIZE] = { 0 };
@@ -82,14 +87,13 @@ u8 TILE_SPRITES[NUM_TILES][TILE_SIZE * TILE_SIZE] = { 0 };
 
 #define BOARD_WIDTH_PX (BOARD_WIDTH * TILE_SIZE)
 #define BOARD_HEIGHT_PX (BOARD_HEIGHT * TILE_SIZE)
-#define BOARD_X ((SCREEN_WIDTH - BOARD_WIDTH_PX) / 2)
+#define BOARD_X ((fb_info.res_x - BOARD_WIDTH_PX) / 2)
 #define BOARD_Y 0
 
 #define IN_BOARD(_x, _y) ((_x) >= 0 && (_y) >= 0 && (_x) < BOARD_WIDTH && (_y) < BOARD_HEIGHT)
 
 // max size of 4x4 to account for all rotations
 #define TTM_SIZE 4
-
 #define TTM_BLOCK(_t, _i, _j) (((_t) & (1 << (((_j) * 4) + (_i)))) != 0)
 
 #define TTM_OFFSET_X(_t)\
@@ -108,8 +112,8 @@ u8 TILE_SPRITES[NUM_TILES][TILE_SIZE * TILE_SIZE] = { 0 };
 #define TTM_OFFSET_Y(_t) (LOBIT(_t) / 4)
 
 #define TTM_FOREACH(_xname, _yname, _xxname, _yyname, _xbase, _ybase)\
-    for (i32 _yname = 0, _yyname = (_ybase); _yname < TTM_SIZE; _yname++,_yyname++)\
-        for (i32 _xname = 0, _xxname = (_xbase); _xname < TTM_SIZE; _xname++,_xxname++)\
+    for (int _yname = 0, _yyname = (_ybase); _yname < TTM_SIZE; _yname++,_yyname++)\
+        for (int _xname = 0, _xxname = (_xbase); _xname < TTM_SIZE; _xname++,_xxname++)\
 
 struct Tetromino {
     enum Tile color;
@@ -187,12 +191,12 @@ static const struct Tetromino TETROMINOS[NUM_TETROMINOS] = {
 #define NUM_LEVELS 30
 
 // from listfist.com/list-of-tetris-levels-by-speed-nes-ntsc-vs-pal
-static u8 FRAMES_PER_STEP[NUM_LEVELS] = {
+static uint8_t FRAMES_PER_STEP[NUM_LEVELS] = {
     48, 43, 38, 33, 28, 23, 18, 13, 8, 6, 5, 5, 5, 4, 4, 4, 3, 3, 3, 2, 2, 2,
     2, 2, 2, 2, 2, 2, 1
 };
 
-static u32 LINE_MULTIPLIERS[4] = {
+static uint32_t LINE_MULTIPLIERS[4] = {
     40, 100, 300, 1200
 };
 
@@ -201,23 +205,23 @@ struct Control {
     bool down;
     bool last;
     bool pressed;
-    u32 pressed_frames;
+    uint32_t pressed_frames;
 };
 
 static struct {
-    u8 board[BOARD_HEIGHT][BOARD_WIDTH];
+    uint8_t board[BOARD_HEIGHT][BOARD_WIDTH];
 
-    u32 frames, steps, frames_since_step;
-    u32 score, lines, level;
-    i32 lines_left;
-    u8 menu, pause, stopped, destroy, game_over, music;
+    uint32_t frames, steps, frames_since_step;
+    uint32_t score, lines, level;
+    int lines_left;
+    uint8_t menu, pause, stopped, destroy, game_over, music;
 
     const struct Tetromino *next;
 
     struct {
         const struct Tetromino *ttm;
-        u8 r;
-        i32 x, y;
+        uint8_t r;
+        int x, y;
         bool done;
     } curr;
 
@@ -245,7 +249,7 @@ static void done() {
     }
 
     // check for lines
-    u32 lines = 0;
+    uint32_t lines = 0;
 
     for (size_t y = 0; y < BOARD_HEIGHT; y++) {
         bool line = true;
@@ -287,7 +291,7 @@ static void done() {
 }
 
 static bool try_modify(
-    const struct Tetromino *ttm, u16 tc, i32 xc, i32 yc, u16 tn, i32 xn, i32 yn) {
+    const struct Tetromino *ttm, u16 tc, int xc, int yc, u16 tn, int xn, int yn) {
     u8 board[BOARD_HEIGHT][BOARD_WIDTH];
     memcpy(&board, &state.board, sizeof(board));
 
@@ -347,7 +351,7 @@ static bool spawn() {
     return true;
 }
 
-static bool move(i32 dx, i32 dy) {
+static bool move(int dx, int dy) {
     if (try_modify(
             state.curr.ttm,
             state.curr.ttm->rotations[state.curr.r],
@@ -379,7 +383,7 @@ static bool rotate(bool right) {
 }
 
 static void generate_sprites() {
-    for (enum Tile t = 0; t < NUM_TILES; t++) {
+    for (enum Tile t = NONE; t < NUM_TILES; t++) {
         if (t == NONE) {
             continue;
         }
@@ -411,7 +415,7 @@ static void render_tile(enum Tile tile, size_t x, size_t y) {
 }
 
 static void render_border() {
-    for (size_t y = 0; y < (SCREEN_HEIGHT / TILE_SIZE); y++) {
+    for (size_t y = 0; y < (fb_info.res_x / TILE_SIZE); y++) {
         size_t yy = BOARD_Y + (y * TILE_SIZE);
 
         render_tile(
@@ -432,13 +436,13 @@ static void render_board() {
     for (size_t y = 0; y < BOARD_HEIGHT; y++) {
         for (size_t x = 0; x < BOARD_WIDTH; x++) {
             u8 data = state.board[y][x];
-            enum Tile tile = data & TILE_MASK;
+            enum Tile tile = (enum Tile)(data & TILE_MASK);
 
             size_t xs = BOARD_X + (x * TILE_SIZE),
                    ys = BOARD_Y + (y * TILE_SIZE);
 
             if (data & TILE_FLAG_FLASH) {
-                screen_fill(RGB(150, 150, 32), xs, ys, TILE_SIZE, TILE_SIZE);
+                fb_fill(RGB(150, 150, 32), xs, ys, TILE_SIZE, TILE_SIZE);
             } else if (tile != NONE) {
                 render_tile(tile, xs, ys);
             }
@@ -448,28 +452,52 @@ static void render_board() {
 }
 
 struct fb_font* tetris_font;
+uint8_t padding = 2;
 
-int font_width(char* buf)
+inline int font_width(char* buf)
 {
-    return strlen(buf) * 16; // or font size
+    return (strlen(buf) + padding) * tetris_font->width - padding; // or font size
+}
+
+void font_get_char(struct fb_font* font, uint8_t* buffer, uint16_t c)
+{
+    const u8 *glyph = &font->glyph[(size_t)c * 8];
+
+    for (size_t yy = 0; yy < 8; yy++) {
+        for (size_t xx = 0; xx < 8; xx++) {
+            if (glyph[yy] & (1 << xx)) {
+                buffer[yy * fb_info.res_x + xx] = 0xffffff;
+            }
+        }
+    }
 }
 
 void font_setup()
 {
     if(tetris_font == NULL_PTR)
-        tetris_font = kalloc(sizeof(struct fb_font) + 8 * 256, KERN_MEM);
-    for(int i = 0;i < 32;i++)
-        memset(tetris_font->glyph + i * 8, 0, 8);
-    memcpy(tetris_font->glyph + 33 * 8, "\x18\x3C\x3C\x18\x18\x00\x18\x00", 8);
+        tetris_font = (struct fb_font*)kalloc(sizeof(struct fb_font) + 8 * 256, KERN_MEM);
+    tetris_font->width = 8;
+    tetris_font->height = 8;
+    tetris_font->get_char = font_get_char;
+    memset(tetris_font->glyph, 0, 32 * 8); // first 32 chars are empty
+    memcpy(tetris_font->glyph + 264, "\x18\x3C\x3C\x18\x18\x00\x18\x00", 8);
+    memcpy(tetris_font->glyph + 264, "\x36\x36\x00\x00\x00\x00\x00\x00", 8);
+    memcpy(tetris_font->glyph + 264, "\x18\x3C\x3C\x18\x18\x00\x18\x00", 8);
+    memcpy(tetris_font->glyph + 264, "\x18\x3C\x3C\x18\x18\x00\x18\x00", 8);
+    memcpy(tetris_font->glyph + 264, "\x18\x3C\x3C\x18\x18\x00\x18\x00", 8);
+    memcpy(tetris_font->glyph + 264, "\x18\x3C\x3C\x18\x18\x00\x18\x00", 8);
 }
 
 void font_str_doubled(char* buf, int x, int y, int color)
 {
     struct fb_rect rect;
     rect.x1 = x, rect.y1 = y; 
-    rect.x2 = x + strlen(buf) * 16, rect.y2 = y + 16;
+    rect.x2 = x + font_width(buf), rect.y2 = y + tetris_font->height;
     for(int i = 0;buf[i] != 0;i++) {
-        fb_write_char(tetris_font, buf, rect);
+        fb_write_char(tetris_font, buf[i], rect);
+        rect.x1 = rect.x2 + padding;
+        rect.y1 = rect.y2;
+        rect.x2 += tetris_font->width, rect.y2 = rect.y1;
     }
 }
 
@@ -509,27 +537,27 @@ static void render_ui() {
 }
 
 static void render_game_over() {
-    const size_t w = SCREEN_WIDTH / 3, h = SCREEN_HEIGHT / 3;
-    screen_fill(
+    const size_t w = fb_info.res_x / 3, h = fb_info.res_y / 3;
+    fb_fill(
         RGB(150, 150, 54),
-        (SCREEN_WIDTH - w) / 2,
-        (SCREEN_HEIGHT - h) / 2,
+        (fb_info.res_x - w) / 2,
+        (fb_info.res_y - h) / 2,
         w,
         h
     );
 
-    screen_fill(
+    fb_fill(
         RGB(54, 54, 32),
-        (SCREEN_WIDTH - (w - 8)) / 2,
-        (SCREEN_HEIGHT - (h - 8)) / 2,
+        (fb_info.res_x - (w - 8)) / 2,
+        (fb_info.res_y - (h - 8)) / 2,
         w - 8,
         h - 8
     );
 
     font_str_doubled(
         "GAME OVER",
-        (SCREEN_WIDTH - font_width("GAME OVER")) / 2,
-        (SCREEN_HEIGHT / 2) - TILE_SIZE,
+        (fb_info.res_x - font_width("GAME OVER")) / 2,
+        (fb_info.res_y / 2) - TILE_SIZE,
         (state.frames / 5) % 2 == 0 ?
             RGB(210, 54, 32) :
             RGB(210, 150, 54)
@@ -540,15 +568,15 @@ static void render_game_over() {
 
     font_str_doubled(
         "SCORE:",
-        (SCREEN_WIDTH - font_width("SCORE:")) / 2,
-        (SCREEN_HEIGHT / 2),
+        (fb_info.res_x - font_width("SCORE:")) / 2,
+        (fb_info.res_y / 2),
         RGB(210, 210, 0)
     );
 
     font_str_doubled(
         buf_score,
-        (SCREEN_WIDTH - font_width(buf_score)) / 2,
-        (SCREEN_HEIGHT / 2) + TILE_SIZE,
+        (fb_info.res_x - font_width(buf_score)) / 2,
+        (fb_info.res_y / 2) + TILE_SIZE,
         RGB(255, 255, 109)
     );
 }
@@ -564,7 +592,7 @@ static void step() {
     state.stopped = stopped;
 }
 
-void reset(u32 level) {
+void reset(uint32_t level) {
     // initialize game state
     memset(&state, 0, sizeof(state));
     state.frames_since_step = FRAMES_PER_STEP[0];
@@ -694,11 +722,11 @@ void render_menu() {
     fb_clear(RGB(0, 0, 0));
 
     // render logo
-    size_t logo_width = strlen(LOGO[0]),
-           logo_x = (fb_info.width - (logo_width * TILE_SIZE)) / 2,
+    size_t logo_width = strlen((char*)LOGO[0]),
+           logo_x = (fb_info.res_x - (logo_width * TILE_SIZE)) / 2,
            logo_y = TILE_SIZE * 3;
 
-    for (i32 x = -1; x < (i32) logo_width + 1; x++) {
+    for (int x = -1; x < (int) logo_width + 1; x++) {
         render_tile(BORDER, logo_x + (x * TILE_SIZE), logo_y - (TILE_SIZE * 2));
         render_tile(BORDER, logo_x + (x * TILE_SIZE), logo_y + (TILE_SIZE * (1 + LOGO_HEIGHT)));
     }
@@ -712,17 +740,17 @@ void render_menu() {
             }
 
             render_tile(
-                GREEN + ((((state.frames / 10) + (6 - (c - 'A'))) / 6) % 8),
+                (enum Tile)(GREEN + ((((state.frames / 10) + (6 - (c - 'A'))) / 6) % 8)),
                 logo_x + (x * TILE_SIZE),
                 logo_y + (y * TILE_SIZE)
             );
         }
     }
 
-    const char *play = "PRESS ENTER TO PLAY";
+    char *play = "PRESS ENTER TO PLAY";
     font_str_doubled(
         play,
-        (fb_info.width - font_width(play)) / 2,
+        (fb_info.res_x - font_width(play)) / 2,
         logo_y + ((LOGO_HEIGHT + 6) * TILE_SIZE),
         (state.frames / 6) % 2 == 0 ?
             RGB(210, 210, 54) :
@@ -741,15 +769,15 @@ void tetris_main(int argc, char** argv) {
     if (sound_enabled()) {
         music_init();
         state.music = true;
-        sound_master(255);
+        dsp_master(255);
     }
 
     state.menu = true;
     bool last_music_toggle = false;
-    u32 last_frame = 0, last = 0;
+    uint32_t last_frame = 0, last = 0;
 
     while (true) {
-        const u32 now = (u32) cmos_read(SECS);
+        const uint32_t now = (uint32_t) cmos_read(SECS);
 
         if (sound_enabled() && now != last) {
             music_tick();
@@ -771,7 +799,7 @@ void tetris_main(int argc, char** argv) {
             if (sound_enabled() && keyboard_char('m')) {
                 if (!last_music_toggle) {
                     state.music = !state.music;
-                    sound_master(state.music ? 255 : 0);
+                    dsp_master(state.music ? 255 : 0);
                 }
 
                 last_music_toggle = true;

@@ -16,6 +16,8 @@
 #define _ESGUS 1 /* Extended Standard for Graphical Unix Systems */
 #define NCPU 32
 #define PI 3.1415926
+#define true 1
+#define false 0
 
 #define NORMAL_VGA 0xffff
 #define EXTENDED_VGA 0xfffe
