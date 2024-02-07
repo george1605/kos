@@ -150,8 +150,8 @@ void keyboard_handler(struct regs *r)
     if (scancode == 27)
       glsig = 0x20;
 
-    if (kbdindex == 0)
-      kbdindex = 0x80;
+    if (kbdindex == 0x80)
+      kbdindex = 0;
 
     kbdbuf[kbdindex++] = kbdus[scancode];
   }
