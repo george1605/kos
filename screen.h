@@ -92,7 +92,7 @@ struct vscreen
    uint16_t s_width, s_height, s_bpp;
    void* s_mem;
    struct spinlock s_lock;
-} scrn_list[NSCREENS];
+} scrn_list[NSCREENS], scrn_cnt;
 
 struct vscreen* scrn_req(int id)
 {
@@ -104,6 +104,14 @@ struct vscreen* scrn_req(int id)
       s->s_mem = vf->mem;
    }
    return (struct vscreen*)NULL_PTR;
+}
+
+void scrn_swap(int id, int* last_id)
+{
+   acquire(&(fb_info.lock));
+   *last_id = scrn_id.s_fd;
+   memcpy(scrn_cnt, &scrn_list[id], sizeof(vscreen));
+   release(&(fb_info.lock));
 }
 
 void scrn_clear(struct vscreen* s, unsigned long color)

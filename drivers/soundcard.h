@@ -132,10 +132,12 @@ void dsp_setup_file()
     sysvf[10].name = strdup("/home/dev/sb16");   
 }
 
+int sb16_enabled = 0;
 void dsp_init()
 {
-    if(!dsp_reset())
-        return; // no SB16 installed
+    if(dsp_reset())
+        sb16_enabled = 1; // no SB16 installed
+    else return;
     dsp_setup_dma((uint32_t*)_soundbuf, sizeof(_soundbuf));
     dsp_setsample(44100);
     u16 sampleCount = (sizeof(_soundbuf) / 2) - 1;
@@ -152,8 +154,4 @@ void dsp_init()
 int getsoundinfo(){
  int u = inb(0x200);
  return u;
-}
-
-void testsound(){
- 
 }
