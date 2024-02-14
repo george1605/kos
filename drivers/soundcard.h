@@ -157,6 +157,11 @@ void dsp_init()
     dsp_setup_file();
 }
 
+void dsp_tick()
+{
+    // nothing here!
+}
+
 int getsoundinfo(){
  int u = inb(0x200);
  return u;

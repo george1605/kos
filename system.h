@@ -369,6 +369,11 @@ __SYSCALL struct window* sys_createwin(char* name, int x, int y, int w, int h)
   return wmout.create(name, x, y, w, h);
 }
 
+__SYSCALL void sys_removewin(struct window* win)
+{
+  wmout.remove(win);
+}
+
 void sys_exit(void* arg1)
 {
   struct proc* p = myproc();
@@ -400,6 +405,9 @@ void syscinit()
   sysc_add(8, sys_execv);
   sysc_add(9, sys_fork);
   sysc_add(10, sys_ioctl);
+  sysc_add(11, sys_setdisplay);
+  sysc_add(12, sys_createwin);
+  sysc_add(13, sys_removewin);
   sysc_add(18, sys_insmod);
   sysc_add(19, sys_delmod);
 }

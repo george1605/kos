@@ -108,10 +108,10 @@ struct vscreen* scrn_req(int id)
 
 void scrn_swap(int id, int* last_id)
 {
-   acquire(&(fb_info.lock));
-   *last_id = scrn_id.s_fd;
-   memcpy(scrn_cnt, &scrn_list[id], sizeof(vscreen));
-   release(&(fb_info.lock));
+   acquire(&(scrn_cnt.s_lock));
+   *last_id = scrn_cnt.s_fd;
+   memcpy(&scrn_cnt, &scrn_list[id], sizeof(struct vscreen));
+   release(&(scrn_cnt.s_lock));
 }
 
 void scrn_clear(struct vscreen* s, unsigned long color)

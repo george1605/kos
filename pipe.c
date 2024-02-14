@@ -167,3 +167,66 @@ void mcopy(struct mailbox m,char* bytes,int offset){
       i++;
   }
 }
+
+typedef void(*rd_func)(void*);
+typedef void(*wr_func)(void*);
+
+struct rdpipe
+{
+  wr_func   wr;
+  rd_func*  rd;
+  size_t num_rd, max_rd;
+  void* handle;
+  struct spinlock lock;
+};
+
+void rdpipe_switch(struct rdpipe* pipe, int id)
+{
+  if(id > pipe->num_rd) return;
+  acquire(&pipe->lock);
+  wr_func temp = pipe->wr;
+  pipe->wr = pipe->rd[id];
+  pipe->rd[id] = temp;
+  release(&pipe->lock);
+}
+
+void rdpipe_add(struct rdpipe* pipe, rd_func reader)
+{
+  if(pipe->num_rd == pipe->max_rd) return;
+  pipe->rd[pipe->num_rd++] = reader;
+}
+
+void rdpipe_setup(struct rdpipe* pipe, wr_func writer)
+{
+  pipe->wr = writer;
+}
+
+// set the writer as an interrup function basically
+void rdpipe_int(struct rdpipe* pipe, int irq_no)
+{
+  irq_install_handler(pipe->wr, irq_no);
+}
+
+// signal to the readers that new data has arrived
+void rdpipe_signal(struct rdpipe* pipe)
+{
+  for(int i = 0;i < pipe->num_rd;i++)
+    pipe->rd[i](pipe->handle);
+}
+
+#define RDPIPE_SET    0x1
+#define RDPIPE_STRCPY 0x2
+
+void rdpipe_write(struct rdpipe* pipe, void* data, int type)
+{
+  switch(type)
+  {
+  case RDPIPE_SET:
+    pipe->handle = data;
+    break;
+  case RDPIPE_STRCPY:
+    strcpy(pipe->handle, data);
+    break;
+  } 
+  rdpipe_signal(pipe);
+}

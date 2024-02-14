@@ -6,6 +6,7 @@
 #include "../process.h" // as a process
 #define keyboard_char(n) kbdbuf[kbdindex] == n
 #define keyboard_key(key) kbdus[key]
+#define NUM_NOTE 8
 #define NOTIFICATION_DURATION_TICKS (TIMER_TPS * 2)
 #define FPS 30
 #define LEVELS 30
@@ -758,6 +759,70 @@ void render_menu() {
     );
 }
 
+static uint8_t volumes[NUM_NOTES];
+static uint8_t notes[NUM_NOTES];
+static uint8_t waves[NUM_NOTES];
+
+void music_init()
+{
+    sound_wave(0, WAVE_TRIANGLE);
+    sound_volume(0, 255);
+
+    sound_wave(1, WAVE_NOISE);
+    sound_volume(1, 128);
+
+    sound_wave(2, WAVE_TRIANGLE);
+    sound_volume(2, 196);
+
+    sound_wave(3, WAVE_TRIANGLE);
+    sound_volume(3, 196);
+
+    // AABA part
+#define PART(_i, _c, _b) do {                           \
+        size_t cs = sizeof(_c) / sizeof(_c[0]),         \
+            bs = sizeof(_b) / sizeof(_b[0]),            \
+            n = 0;                                      \
+        memcpy(&TRACK[_i][n], _c, sizeof(_c)); n += cs; \
+        memcpy(&TRACK[_i][n], _c, sizeof(_c)); n += cs; \
+        memcpy(&TRACK[_i][n], _b, sizeof(_b)); n += bs; \
+        memcpy(&TRACK[_i][n], _c, sizeof(_c));          \
+        PART_LENGTHS[_i] = cs * 3 + bs;                 \
+    } while (0);
+
+    PART(0, CHORUS_MELODY, BRIDGE_MELODY);
+    PART(1, CHORUS_SNARE, BRIDGE_SNARE);
+    PART(2, CHORUS_BASS, BRIDGE_BASS);
+    PART(3, CHORUS_HARMONY, BRIDGE_HARMONY);
+
+
+    for (size_t i = 0; i < TRACK_PARTS; i++) {
+        indices[i] = -1;
+    }
+
+}
+
+void music_tick()
+{
+    for (size_t i = 0; i < TRACK_PARTS; i++) {
+        if (indices[i] == -1 || (current[i].ticks -= 1) <= 0) {
+            indices[i] = (indices[i] + 1) % PART_LENGTHS[i];
+
+            double remainder = fabs(current[i].ticks);
+
+            struct Note note = TRACK[i][indices[i]];
+            current[i].note = note;
+            current[i].ticks = TICKS_PER_SIXTEENTH * note.duration - remainder;
+
+            sound_note(i, note.octave, note.note);
+        }
+
+        // remove last tick to give each note an attack
+        if (current[i].ticks <= 1) {
+            sound_note(i, OCTAVE_1, NOTE_NONE);
+        }
+    }
+}
+
 inline u8 sound_enabled()
 {
     return sb16_enabled;
@@ -781,7 +846,6 @@ void tetris_main(int argc, char** argv) {
 
         if (sound_enabled() && now != last) {
             music_tick();
-            sound_tick();
             last = now;
         }
 
@@ -807,7 +871,7 @@ void tetris_main(int argc, char** argv) {
                 last_music_toggle = false;
             }
 
-            const char *notification = get_notification();
+            char *notification = (char*)get_notification();
             if (notification != NULL) {
                 font_str_doubled(notification, 0, 0, RGB(210, 32, 32));
             }
